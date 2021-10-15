@@ -1,4 +1,4 @@
-module go-3dasset
+module github.com/flywave/go-3dasset
 
 go 1.16
 
