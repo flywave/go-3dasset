@@ -22,11 +22,11 @@ func (cv *FbxToMst) Convert(path string) (*mst.Mesh, *[6]float64, error) {
 
 	f, err := os.Open(path)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 	scene, er := fbx.Load(f)
 	if er != nil {
-		return nil, nil, nil, er
+		return nil, nil, er
 	}
 	cv.baseDir = filepath.Dir(path)
 	isInstance := make(map[uint64]bool)

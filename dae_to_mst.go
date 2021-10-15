@@ -31,13 +31,13 @@ func (cv *DaeToMst) Convert(path string) (*mst.Mesh, *[6]float64, error) {
 
 	file, err := os.Open(path)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 
 	defer file.Close()
 	collada, err := dae.LoadDocumentFromReader(file)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 	cv.baseDir = filepath.Dir(path)
 
