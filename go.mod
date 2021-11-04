@@ -14,6 +14,6 @@ require (
 	github.com/flywave/ofbx v0.1.0
 	github.com/ftrvxmtrx/tga v0.0.0-20150524081124-bd8e8d5be13a
 	github.com/oakmound/oak/v2 v2.5.0 // indirect
-	github.com/qmuntal/gltf v0.9.1
+	github.com/qmuntal/gltf v0.20.3
 	golang.org/x/image v0.0.0-20210628002857-a66eb6448b8d
 )

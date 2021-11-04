@@ -13,7 +13,7 @@ import (
 
 	mst "github.com/flywave/go-mst"
 	dmat "github.com/flywave/go3d/float64/mat4"
-	"github.com/flywave/go3d/float64/vec4"
+	dvec4 "github.com/flywave/go3d/float64/vec4"
 
 	"github.com/flywave/go3d/vec2"
 	"github.com/flywave/go3d/vec3"
@@ -49,7 +49,7 @@ func (g *GltfToMst) Convert(path string) (*mst.Mesh, *[6]float64, error) {
 	for _, nd := range doc.Nodes {
 		meshId := *nd.Mesh
 		if v := isInstance[meshId]; v {
-			bx := g.transMesh(doc, mesh, &doc.Meshes[meshId])
+			bx := g.transMesh(doc, mesh, doc.Meshes[meshId])
 
 			addPoint(bbx, &[3]float64{bx[0], bx[1], bx[2]})
 			addPoint(bbx, &[3]float64{bx[3], bx[4], bx[5]})
@@ -57,7 +57,7 @@ func (g *GltfToMst) Convert(path string) (*mst.Mesh, *[6]float64, error) {
 			var inst *mst.InstanceMst
 			var ok bool
 			if inst, ok = instMp[meshId]; ok {
-				bx := g.transMesh(doc, mesh, &doc.Meshes[meshId])
+				bx := g.transMesh(doc, mesh, doc.Meshes[meshId])
 				inst = &mst.InstanceMst{MeshNodeId: uint32(len(mesh.Nodes)), BBox: bx}
 				instMp[meshId] = inst
 			}
@@ -86,12 +86,12 @@ func (g *GltfToMst) transMesh(doc *gltf.Document, mstMh *mst.Mesh, mh *gltf.Mesh
 		tg.Batchid = int32(len(mstMh.Materials))
 		g.transMaterial(doc, mstMh, *ps.Material)
 		acc := doc.Accessors[int(*ps.Indices)]
-		faceBuff = &doc.Buffers[int(doc.BufferViews[int(*acc.BufferView)].Buffer)]
+		faceBuff = doc.Buffers[int(doc.BufferViews[int(*acc.BufferView)].Buffer)]
 		tg.Faces = make([][3]uint32, int(acc.Count/3))
 		bytePerIndices := 1
-		if acc.ComponentType == gltf.Short || acc.ComponentType == gltf.UnsignedShort {
+		if acc.ComponentType == gltf.ComponentShort || acc.ComponentType == gltf.ComponentUshort {
 			bytePerIndices = 2
-		} else if acc.ComponentType == gltf.UnsignedInt || acc.ComponentType == gltf.Float {
+		} else if acc.ComponentType == gltf.ComponentUint || acc.ComponentType == gltf.ComponentFloat {
 			bytePerIndices = 4
 		}
 		bf := bytes.NewBuffer(faceBuff.Data[acc.ByteOffset : int(acc.ByteOffset)+int(acc.Count)*bytePerIndices])
@@ -102,8 +102,8 @@ func (g *GltfToMst) transMesh(doc *gltf.Document, mstMh *mst.Mesh, mh *gltf.Mesh
 		if idx, ok := ps.Attributes["POSITION"]; ok {
 			if _, ok := accMap[idx]; !ok {
 				acc = doc.Accessors[idx]
-				posView = &doc.BufferViews[int(*acc.BufferView)]
-				posBuff = &doc.Buffers[int(posView.Buffer)]
+				posView = doc.BufferViews[int(*acc.BufferView)]
+				posBuff = doc.Buffers[int(posView.Buffer)]
 				bf := bytes.NewBuffer(posBuff.Data[int(posView.ByteOffset):int(posView.ByteOffset+posView.ByteLength)])
 				for i := 0; i < int(acc.Count); i++ {
 					v := vec3.T{}
@@ -118,8 +118,8 @@ func (g *GltfToMst) transMesh(doc *gltf.Document, mstMh *mst.Mesh, mh *gltf.Mesh
 		if idx, ok := ps.Attributes["TEXCOORD_0"]; ok {
 			if _, ok := accMap[idx]; !ok {
 				acc = doc.Accessors[idx]
-				texView = &doc.BufferViews[int(*acc.BufferView)]
-				texBuff = &doc.Buffers[int(texView.Buffer)]
+				texView = doc.BufferViews[int(*acc.BufferView)]
+				texBuff = doc.Buffers[int(texView.Buffer)]
 				bf := bytes.NewBuffer(texBuff.Data[int(texView.ByteOffset):int(texView.ByteOffset+texView.ByteLength)])
 				for i := 0; i < int(acc.Count); i++ {
 					v := vec2.T{}
@@ -133,8 +133,8 @@ func (g *GltfToMst) transMesh(doc *gltf.Document, mstMh *mst.Mesh, mh *gltf.Mesh
 		if idx, ok := ps.Attributes["NORMAL"]; ok {
 			if _, ok := accMap[idx]; !ok {
 				acc = doc.Accessors[idx]
-				nlView = &doc.BufferViews[int(*acc.BufferView)]
-				nlBuff = &doc.Buffers[int(nlView.Buffer)]
+				nlView = doc.BufferViews[int(*acc.BufferView)]
+				nlBuff = doc.Buffers[int(nlView.Buffer)]
 				bf := bytes.NewBuffer(nlBuff.Data[int(nlView.ByteOffset):int(nlView.ByteOffset+texView.ByteLength)])
 				for i := 0; i < int(acc.Count); i++ {
 					v := vec3.T{}
@@ -157,10 +157,10 @@ func (g *GltfToMst) transMaterial(doc *gltf.Document, mstMh *mst.Mesh, id uint32
 	mtl.Emissive[1] = byte(mt.EmissiveFactor[0] * 255)
 	mtl.Emissive[2] = byte(mt.EmissiveFactor[0] * 255)
 	if mt.PBRMetallicRoughness.BaseColorFactor != nil {
-		mtl.Color[0] = byte(mt.PBRMetallicRoughness.BaseColorFactor.R * 255)
-		mtl.Color[1] = byte(mt.PBRMetallicRoughness.BaseColorFactor.G * 255)
-		mtl.Color[2] = byte(mt.PBRMetallicRoughness.BaseColorFactor.B * 255)
-		mtl.Transparency = 1 - float32(mt.PBRMetallicRoughness.BaseColorFactor.A)
+		mtl.Color[0] = byte(mt.PBRMetallicRoughness.BaseColorFactor[0] * 255)
+		mtl.Color[1] = byte(mt.PBRMetallicRoughness.BaseColorFactor[1] * 255)
+		mtl.Color[2] = byte(mt.PBRMetallicRoughness.BaseColorFactor[2] * 255)
+		mtl.Transparency = 1 - float32(mt.PBRMetallicRoughness.BaseColorFactor[3])
 	}
 	if mt.PBRMetallicRoughness.MetallicFactor != nil {
 		mtl.Metallic = float32(*mt.PBRMetallicRoughness.MetallicFactor)
@@ -228,12 +228,12 @@ func (g *GltfToMst) decodeImage(mime string, rd io.Reader) (*mst.Texture, error)
 	return nil, errors.New("not support image type")
 }
 
-func toMat(mat [16]float64) *dmat.T {
+func toMat(mt [16]float32) *dmat.T {
 	m := &dmat.T{}
-	m[0] = vec4.T{mat[0], mat[1], mat[2], mat[3]}
-	m[1] = vec4.T{mat[4], mat[5], mat[6], mat[7]}
-	m[2] = vec4.T{mat[8], mat[9], mat[10], mat[11]}
-	m[3] = vec4.T{mat[12], mat[13], mat[14], mat[15]}
+	m[0] = dvec4.T{float64(mt[0]), float64(mt[1]), float64(mt[2]), float64(mt[3])}
+	m[1] = dvec4.T{float64(mt[4]), float64(mt[5]), float64(mt[6]), float64(mt[7])}
+	m[2] = dvec4.T{float64(mt[8]), float64(mt[9]), float64(mt[10]), float64(mt[11])}
+	m[3] = dvec4.T{float64(mt[12]), float64(mt[13]), float64(mt[14]), float64(mt[15])}
 	return m
 }
 
