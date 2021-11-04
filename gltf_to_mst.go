@@ -48,7 +48,7 @@ func (g *GltfToMst) Convert(path string) (*mst.Mesh, *[6]float64, error) {
 	instMp := make(map[uint32]*mst.InstanceMst)
 	for _, nd := range doc.Nodes {
 		meshId := *nd.Mesh
-		if v := isInstance[meshId]; v {
+		if v := isInstance[meshId]; !v {
 			bx := g.transMesh(doc, mesh, doc.Meshes[meshId])
 
 			addPoint(bbx, &[3]float64{bx[0], bx[1], bx[2]})
@@ -56,7 +56,7 @@ func (g *GltfToMst) Convert(path string) (*mst.Mesh, *[6]float64, error) {
 		} else {
 			var inst *mst.InstanceMst
 			var ok bool
-			if inst, ok = instMp[meshId]; ok {
+			if inst, ok = instMp[meshId]; !ok {
 				bx := g.transMesh(doc, mesh, doc.Meshes[meshId])
 				inst = &mst.InstanceMst{MeshNodeId: uint32(len(mesh.Nodes)), BBox: bx}
 				instMp[meshId] = inst
