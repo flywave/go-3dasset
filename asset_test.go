@@ -4,5 +4,5 @@ import "testing"
 
 func TestGlb(t *testing.T) {
 	g := GltfToMst{}
-	g.Convert("./test/Horse.glb")
+	g.Convert("./test/Xbot.glb")
 }
