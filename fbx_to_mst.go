@@ -103,7 +103,7 @@ func (cv *FbxToMst) convertMesh(mstMh *mst.Mesh, mh *fbx.Mesh) *dvec3.Box {
 		} else {
 			gp = fgMap[bid]
 		}
-		gp.Faces = append(gp.Faces, [3]uint32{uint32(oldV[i*3]), uint32(oldV[i*3+1]), uint32(oldV[i*3+2])})
+		gp.Faces = append(gp.Faces, &mst.Face{Vertex: [3]uint32{uint32(oldV[i*3]), uint32(oldV[i*3+1]), uint32(oldV[i*3+2])}})
 	}
 	return &bbx
 }

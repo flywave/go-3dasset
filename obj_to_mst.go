@@ -126,7 +126,7 @@ func (obj *ObjToMst) addTrigToMeshNode(trg *fmesh.Triangle, nd *mst.MeshNode, mt
 	ext.Extend(&dvec3.T{float64(v1.V[0]), float64(v1.V[1]), float64(v1.V[2])})
 	ext.Extend(&dvec3.T{float64(v2.V[0]), float64(v2.V[1]), float64(v2.V[2])})
 
-	mrg.Faces = append(mrg.Faces, [3]uint32{uint32(len(nd.Vertices)), uint32(len(nd.Vertices) + 1), uint32(len(nd.Vertices) + 2)})
+	mrg.Faces = append(mrg.Faces, &mst.Face{Vertex: [3]uint32{uint32(len(nd.Vertices)), uint32(len(nd.Vertices) + 1), uint32(len(nd.Vertices) + 2)}})
 	nd.Vertices = append(nd.Vertices, (vec3.T)(v0.V), (vec3.T)(v1.V), (vec3.T)(v2.V))
 	nd.TexCoords = append(nd.TexCoords, (vec2.T)(v0.T), (vec2.T)(v1.T), (vec2.T)(v2.T))
 	nd.Normals = append(nd.Normals, (vec3.T)(v0.VN), (vec3.T)(v1.VN), (vec3.T)(v2.VN))

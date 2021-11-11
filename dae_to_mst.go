@@ -309,7 +309,7 @@ func (cv *DaeToMst) parseVectorInuts(daeMh *dae.Mesh, input *dae.InputUnshared, 
 	bbx := dvec3.MinBox
 	for _, fg := range mstNd.FaceGroup {
 		for _, f := range fg.Faces {
-			for _, i := range f {
+			for _, i := range f.Vertex {
 				vt[0], _ = strconv.ParseFloat(ay[int(i)*stride], 64)
 				vt[1], _ = strconv.ParseFloat(ay[int(i)*stride+1], 64)
 				vt[2], _ = strconv.ParseFloat(ay[int(i)*stride+2], 64)
@@ -333,7 +333,7 @@ func (cv *DaeToMst) rebuildFaceGrouops(mstNd *mst.MeshNode) {
 		ng := &mst.MeshTriangle{}
 		ng.Batchid = fg.Batchid
 		for i := range fg.Faces {
-			ng.Faces = append(ng.Faces, [3]uint32{uint32(i*3 + start), uint32(i*3 + 1 + start), uint32(i*3 + 2 + start)})
+			ng.Faces = append(ng.Faces, &mst.Face{Vertex: [3]uint32{uint32(i*3 + start), uint32(i*3 + 1 + start), uint32(i*3 + 2 + start)}})
 		}
 		start += len(fg.Faces) * 3
 		newTrgs = append(newTrgs, ng)
@@ -370,18 +370,18 @@ func (cv *DaeToMst) parsePolyInuts(plist *dae.Polylist, srcMap map[string]*dae.S
 			f[0] = uint32(fs[0])
 			f[1] = uint32(fs[1])
 			f[2] = uint32(fs[2])
-			faceG.Faces = append(faceG.Faces, f)
+			faceG.Faces = append(faceG.Faces, &mst.Face{Vertex: f})
 		} else if count == 4 {
 			f := [3]uint32{}
 			f[0] = uint32(fs[0])
 			f[1] = uint32(fs[1])
 			f[2] = uint32(fs[2])
-			faceG.Faces = append(faceG.Faces, f)
+			faceG.Faces = append(faceG.Faces, &mst.Face{Vertex: f})
 			f1 := [3]uint32{}
 			f1[0] = uint32(fs[2])
 			f1[1] = uint32(fs[3])
 			f1[2] = uint32(fs[0])
-			faceG.Faces = append(faceG.Faces, f1)
+			faceG.Faces = append(faceG.Faces, &mst.Face{Vertex: f})
 		}
 	}
 	mstNd.FaceGroup = append(mstNd.FaceGroup, faceG)
@@ -515,7 +515,7 @@ func (cv *DaeToMst) parseTrgs(trg dae.Trig, srcMap map[string]*dae.Source, mstNd
 		index += inputCount
 		v, _ = strconv.ParseInt(idxs[index+int(offset)], 10, 32)
 		f[2] = uint32(v)
-		faceG.Faces = append(faceG.Faces, f)
+		faceG.Faces = append(faceG.Faces, &mst.Face{Vertex: f})
 	}
 	mstNd.FaceGroup = append(mstNd.FaceGroup, faceG)
 

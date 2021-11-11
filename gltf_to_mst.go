@@ -87,7 +87,7 @@ func (g *GltfToMst) transMesh(doc *gltf.Document, mstMh *mst.Mesh, mh *gltf.Mesh
 		g.transMaterial(doc, mstMh, *ps.Material)
 		acc := doc.Accessors[int(*ps.Indices)]
 		faceBuff = doc.Buffers[int(doc.BufferViews[int(*acc.BufferView)].Buffer)]
-		tg.Faces = make([][3]uint32, int(acc.Count/3))
+		tg.Faces = make([]*mst.Face, int(acc.Count/3))
 		bytePerIndices := 1
 		if acc.ComponentType == gltf.ComponentShort || acc.ComponentType == gltf.ComponentUshort {
 			bytePerIndices = 2
@@ -96,7 +96,7 @@ func (g *GltfToMst) transMesh(doc *gltf.Document, mstMh *mst.Mesh, mh *gltf.Mesh
 		}
 		bf := bytes.NewBuffer(faceBuff.Data[acc.ByteOffset : int(acc.ByteOffset)+int(acc.Count)*bytePerIndices])
 		for i := 0; i < len(tg.Faces); i++ {
-			binary.Read(bf, binary.LittleEndian, &tg.Faces[i])
+			binary.Read(bf, binary.LittleEndian, &tg.Faces[i].Vertex)
 		}
 
 		if idx, ok := ps.Attributes["POSITION"]; ok {

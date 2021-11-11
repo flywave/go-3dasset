@@ -86,7 +86,7 @@ func (cv *ThreeDsToMst) convert3dsMesh(m *tds.Mesh, mstMesh *mst.Mesh, mtls []td
 			nd.FaceGroup = append(nd.FaceGroup, tg)
 			cv.convert3dsMtl(mstMesh, &mtls[f.Material])
 		}
-		tg.Faces = append(tg.Faces, [3]uint32{uint32(f.Index[0]), uint32(f.Index[1]), uint32(f.Index[2])})
+		tg.Faces = append(tg.Faces, &mst.Face{Vertex: [3]uint32{uint32(f.Index[0]), uint32(f.Index[1]), uint32(f.Index[2])}})
 	}
 	mstMesh.Nodes = append(mstMesh.Nodes, nd)
 	return &ext
