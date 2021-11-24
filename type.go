@@ -9,4 +9,5 @@ const (
 	THREEDS = ".3ds"
 	DAE     = ".dae"
 	FBX     = ".fbx"
+	TBIN    = ".bin"
 )

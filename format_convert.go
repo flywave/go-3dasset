@@ -20,6 +20,8 @@ func FormatFactory(format string) FormatConvert {
 		return &GltfToMst{}
 	case OBJ:
 		return &ObjToMst{}
+	case TBIN:
+		return &ThreejsBinToMst{}
 	}
 	return nil
 }
