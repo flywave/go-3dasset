@@ -14,16 +14,8 @@ func TestGlb(t *testing.T) {
 
 func TestObj(t *testing.T) {
 	g := ObjToMst{}
-	mh, _, _ := g.Convert("/home/hj/workspace/GISCore/build/public/Resources/model/public/BGYbieshu2/BGYbieshu2.obj")
-	f, _ := os.Create("/home/hj/workspace/GISCore/build/public/Resources/model/public/BGYbieshu2/BGYbieshu2.mst")
-	for _, nd := range mh.Nodes {
-		for i := range nd.Vertices {
-			v := &nd.Vertices[i]
-			y := v[1]
-			z := -v[2]
-			v[1] = z
-			v[2] = y
-		}
-	}
+	mh, _, _ := g.Convert("/home/hj/workspace/flywave-mesh/data/test/test.obj")
+	f, _ := os.Create("/home/hj/workspace/flywave-mesh/data/test/test.mst")
+
 	mst.MeshMarshal(f, mh)
 }
