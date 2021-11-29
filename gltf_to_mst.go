@@ -96,7 +96,9 @@ func (g *GltfToMst) transMesh(doc *gltf.Document, mstMh *mst.Mesh, mh *gltf.Mesh
 		}
 		bf := bytes.NewBuffer(faceBuff.Data[acc.ByteOffset : int(acc.ByteOffset)+int(acc.Count)*bytePerIndices])
 		for i := 0; i < len(tg.Faces); i++ {
-			binary.Read(bf, binary.LittleEndian, &tg.Faces[i].Vertex)
+			f := &mst.Face{}
+			binary.Read(bf, binary.LittleEndian, &f.Vertex)
+			tg.Faces[i] = f
 		}
 
 		if idx, ok := ps.Attributes["POSITION"]; ok {

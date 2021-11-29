@@ -13,9 +13,9 @@ func TestGlb(t *testing.T) {
 }
 
 func TestObj(t *testing.T) {
-	g := ObjToMst{}
-	mh, _, _ := g.Convert("/home/hj/workspace/flywave-mesh/data/test/test.obj")
-	f, _ := os.Create("/home/hj/workspace/flywave-mesh/data/test/test.mst")
+	g := GltfToMst{}
+	mh, _, _ := g.Convert("/home/hj/snap/dukto/16/Horse.glb")
+	f, _ := os.Create("/home/hj/snap/dukto/16/Horse.mst")
 
 	mst.MeshMarshal(f, mh)
 }
