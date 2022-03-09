@@ -31,14 +31,15 @@ func (obj *ObjToMst) Convert(path string) (*mst.Mesh, *[6]float64, error) {
 
 	for _, fg := range loader.FaceGroup {
 		mtg := &mst.MeshTriangle{}
+		first := fg[0]
 		if loader.Triangles != nil {
-			for i := fg[0]; i < fg[1]; i++ {
-				t := &loader.Triangles[i]
+			for i := 0; i < fg[1]; i++ {
+				t := &loader.Triangles[first+i]
 				obj.addTrigToMeshNode(mtg, t, meshNode, mtlGroup, gmap, &ext)
 			}
 		} else if loader.Triarray != nil {
-			for i := fg[0]; i < fg[1]; i++ {
-				t, er := loader.Triarray.GetTriangle(i)
+			for i := 0; i < fg[1]; i++ {
+				t, er := loader.Triarray.GetTriangle(first + i)
 				if er != nil {
 					return nil, nil, er
 				}
@@ -117,6 +118,7 @@ func (obj *ObjToMst) addTrigToMeshNode(mrg *mst.MeshTriangle, trg *fmesh.Triangl
 	ext.Extend(&dvec3.T{float64(v0.V[0]), float64(v0.V[1]), float64(v0.V[2])})
 	ext.Extend(&dvec3.T{float64(v1.V[0]), float64(v1.V[1]), float64(v1.V[2])})
 	ext.Extend(&dvec3.T{float64(v2.V[0]), float64(v2.V[1]), float64(v2.V[2])})
+	mrg.Batchid = int32(trg.Mtl)
 
 	mrg.Faces = append(mrg.Faces, &mst.Face{Vertex: [3]uint32{uint32(len(nd.Vertices)), uint32(len(nd.Vertices) + 1), uint32(len(nd.Vertices) + 2)}})
 	nd.Vertices = append(nd.Vertices, (vec3.T)(v0.V), (vec3.T)(v1.V), (vec3.T)(v2.V))
