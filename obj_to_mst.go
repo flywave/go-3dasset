@@ -29,19 +29,25 @@ func (obj *ObjToMst) Convert(path string) (*mst.Mesh, *[6]float64, error) {
 	mtlGroup := make(map[uint32]int)
 	gmap := make(map[uint32]int)
 
-	if loader.Triangles != nil {
-		for _, t := range loader.Triangles {
-			obj.addTrigToMeshNode(&t, meshNode, mtlGroup, gmap, &ext)
-		}
-	} else if loader.Triarray != nil {
-		for i := 0; i < int(loader.Triarray.Size()); i++ {
-			t, er := loader.Triarray.GetTriangle(i)
-			if er != nil {
-				return nil, nil, er
+	for _, fg := range loader.FaceGroup {
+		mtg := &mst.MeshTriangle{}
+		if loader.Triangles != nil {
+			for i := fg[0]; i < fg[1]; i++ {
+				t := &loader.Triangles[i]
+				obj.addTrigToMeshNode(mtg, t, meshNode, mtlGroup, gmap, &ext)
 			}
-			obj.addTrigToMeshNode(&t, meshNode, mtlGroup, gmap, &ext)
+		} else if loader.Triarray != nil {
+			for i := fg[0]; i < fg[1]; i++ {
+				t, er := loader.Triarray.GetTriangle(i)
+				if er != nil {
+					return nil, nil, er
+				}
+				obj.addTrigToMeshNode(mtg, &t, meshNode, mtlGroup, gmap, &ext)
+			}
 		}
+		meshNode.FaceGroup = append(meshNode.FaceGroup, mtg)
 	}
+
 	mesh.Nodes = append(mesh.Nodes, meshNode)
 	if len(loader.Materials) > 0 {
 		for i, mtl := range loader.Materials {
@@ -104,21 +110,7 @@ func (obj *ObjToMst) Convert(path string) (*mst.Mesh, *[6]float64, error) {
 	return mesh, ext.Array(), nil
 }
 
-func (obj *ObjToMst) addTrigToMeshNode(trg *fmesh.Triangle, nd *mst.MeshNode, mtlGroup map[uint32]int, groupmap map[uint32]int, ext *dvec3.Box) {
-	idx, ok := groupmap[trg.Mtl]
-	var mrg *mst.MeshTriangle
-	if !ok {
-		idx = len(nd.FaceGroup)
-		mrg = &mst.MeshTriangle{}
-		nd.FaceGroup = append(nd.FaceGroup, mrg)
-		mrg.Batchid = int32(trg.Mtl)
-		if mrg.Batchid < 0 {
-			mrg.Batchid = 0
-		}
-		mtlGroup[trg.Mtl] = int(trg.Tex)
-		groupmap[trg.Mtl] = idx
-	}
-	mrg = nd.FaceGroup[idx]
+func (obj *ObjToMst) addTrigToMeshNode(mrg *mst.MeshTriangle, trg *fmesh.Triangle, nd *mst.MeshNode, mtlGroup map[uint32]int, groupmap map[uint32]int, ext *dvec3.Box) {
 	v0 := &trg.Vertices[0]
 	v1 := &trg.Vertices[1]
 	v2 := &trg.Vertices[2]

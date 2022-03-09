@@ -137,7 +137,7 @@ func (g *GltfToMst) transMesh(doc *gltf.Document, mstMh *mst.Mesh, mh *gltf.Mesh
 				acc = doc.Accessors[idx]
 				nlView = doc.BufferViews[int(*acc.BufferView)]
 				nlBuff = doc.Buffers[int(nlView.Buffer)]
-				bf := bytes.NewBuffer(nlBuff.Data[int(nlView.ByteOffset):int(nlView.ByteOffset+texView.ByteLength)])
+				bf := bytes.NewBuffer(nlBuff.Data[int(nlView.ByteOffset):int(nlView.ByteOffset+nlView.ByteLength)])
 				for i := 0; i < int(acc.Count); i++ {
 					v := vec3.T{}
 					binary.Read(bf, binary.LittleEndian, &v)

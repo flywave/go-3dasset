@@ -1,10 +1,7 @@
 package asset3d
 
 import (
-	"os"
 	"testing"
-
-	"github.com/flywave/go-mst"
 )
 
 func TestGlb(t *testing.T) {
@@ -14,8 +11,6 @@ func TestGlb(t *testing.T) {
 
 func TestObj(t *testing.T) {
 	g := GltfToMst{}
-	mh, _, _ := g.Convert("/home/hj/snap/dukto/16/Horse.glb")
-	f, _ := os.Create("/home/hj/snap/dukto/16/Horse.mst")
+	g.Convert("/home/hj/workspace/flywave-3dtile-plugin/server/data/glb/0.glb")
 
-	mst.MeshMarshal(f, mh)
 }
