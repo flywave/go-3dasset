@@ -20,8 +20,8 @@ func TestObj(t *testing.T) {
 
 func TestObjTomst(t *testing.T) {
 	g := ObjToMst{}
-	mh, _, _ := g.Convert("/home/hj/workspace/flywave-mesh/data/test/test.obj")
-	f, _ := os.Create("/home/hj/workspace/flywave-mesh/data/test/test.mst")
+	mh, _, _ := g.Convert("/home/hj/workspace/go-3dasset/test/female02/female02_vertex_colors.obj")
+	f, _ := os.Create("/home/hj/workspace/go-3dasset/test/female02/female02_vertex_colors.obj.mst")
 	mst.MeshMarshal(f, mh)
 	f.Close()
 }
