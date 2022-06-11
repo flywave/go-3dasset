@@ -46,6 +46,9 @@ func (obj *ObjToMst) Convert(path string) (*mst.Mesh, *[6]float64, error) {
 				obj.addTrigToMeshNode(mtg, &t, meshNode, mtlGroup, gmap, &ext)
 			}
 		}
+		if mtg.Batchid == -1 {
+			mtg.Batchid = 0
+		}
 		meshNode.FaceGroup = append(meshNode.FaceGroup, mtg)
 	}
 
