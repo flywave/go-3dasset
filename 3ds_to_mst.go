@@ -33,7 +33,7 @@ func (cv *ThreeDsToMst) Convert(path string) (*mst.Mesh, *[6]float64, error) {
 	}
 	cv.baseDir = filepath.Dir(path)
 	ext := dvec3.MinBox
-	instMp := make(map[string]*mst.InstanceMst)
+	instMp := make(map[string]*mst.InstanceMesh)
 
 	for _, m := range mhs {
 		instsNd, ok := ndMap[m.Name]
@@ -41,11 +41,11 @@ func (cv *ThreeDsToMst) Convert(path string) (*mst.Mesh, *[6]float64, error) {
 			bx := cv.convert3dsMesh(&m, mesh, mtls)
 			ext.Join(bx)
 		} else {
-			var inst *mst.InstanceMst
+			var inst *mst.InstanceMesh
 			var ok bool
 			if inst, ok = instMp[m.Name]; !ok {
 				bx := cv.convert3dsMesh(&m, mesh, mtls)
-				inst = &mst.InstanceMst{MeshNodeId: uint32(len(mesh.Nodes)), BBox: bx.Array()}
+				inst = &mst.InstanceMesh{BBox: bx.Array()}
 				instMp[m.Name] = inst
 			}
 			inst.Transfors = append(inst.Transfors, cv.toMat(instsNd))

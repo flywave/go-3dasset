@@ -30,7 +30,7 @@ func (cv *FbxToMst) Convert(path string) (*mst.Mesh, *[6]float64, error) {
 	}
 	cv.baseDir = filepath.Dir(path)
 	isInstance := make(map[uint64]bool)
-	instMp := make(map[uint64]*mst.InstanceMst)
+	instMp := make(map[uint64]*mst.InstanceMesh)
 
 	for _, mh := range scene.Meshes {
 		if _, ok := isInstance[mh.ID()]; ok {
@@ -46,18 +46,18 @@ func (cv *FbxToMst) Convert(path string) (*mst.Mesh, *[6]float64, error) {
 			bx := cv.convertMesh(mesh, mh)
 			bbx.Join(bx)
 		} else {
-			var inst *mst.InstanceMst
+			var inst *mst.InstanceMesh
 			var ok bool
 			if inst, ok = instMp[meshId]; !ok {
 				bx := cv.convertMesh(mesh, mh)
-				inst = &mst.InstanceMst{MeshNodeId: uint32(len(mesh.Nodes)), BBox: bx.Array()}
+				inst = &mst.InstanceMesh{BBox: bx.Array()}
 				instMp[meshId] = inst
 			}
 			mtx := fbx.GetGlobalMatrix(mh)
 			inst.Transfors = append(inst.Transfors, arryToMat(mtx.ToArray()))
 		}
 	}
-	insts := []*mst.InstanceMst{}
+	insts := []*mst.InstanceMesh{}
 	for _, v := range instMp {
 		insts = append(insts, v)
 	}
