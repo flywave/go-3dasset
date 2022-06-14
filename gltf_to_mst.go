@@ -88,13 +88,8 @@ func (g *GltfToMst) transMesh(doc *gltf.Document, mstMh *mst.Mesh, mh *gltf.Mesh
 		acc := doc.Accessors[int(*ps.Indices)]
 		faceBuff = doc.Buffers[int(doc.BufferViews[int(*acc.BufferView)].Buffer)]
 		tg.Faces = make([]*mst.Face, int(acc.Count/3))
-		bytePerIndices := 1
-		if acc.ComponentType == gltf.ComponentShort || acc.ComponentType == gltf.ComponentUshort {
-			bytePerIndices = 2
-		} else if acc.ComponentType == gltf.ComponentUint || acc.ComponentType == gltf.ComponentFloat {
-			bytePerIndices = 4
-		}
-		bf := bytes.NewBuffer(faceBuff.Data[acc.ByteOffset : int(acc.ByteOffset)+int(acc.Count)*bytePerIndices])
+		faceView := doc.BufferViews[int(*acc.BufferView)]
+		bf := bytes.NewBuffer(faceBuff.Data[int(faceView.ByteOffset):int(faceView.ByteOffset+faceView.ByteLength)])
 		for i := 0; i < len(tg.Faces); i++ {
 			f := &mst.Face{}
 			binary.Read(bf, binary.LittleEndian, &f.Vertex)
