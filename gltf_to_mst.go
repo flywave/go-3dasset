@@ -26,9 +26,11 @@ var (
 )
 
 type GltfToMst struct {
+	mtlMap map[uint32]bool
 }
 
 func (g *GltfToMst) Convert(path string) (*mst.Mesh, *[6]float64, error) {
+	g.mtlMap = make(map[uint32]bool)
 	mesh := mst.NewMesh()
 	bbx := &[6]float64{}
 	doc, err := gltf.Open(path)
@@ -83,7 +85,7 @@ func (g *GltfToMst) transMesh(doc *gltf.Document, mstMh *mst.Mesh, mh *gltf.Mesh
 	var nlView *gltf.BufferView
 	for _, ps := range mh.Primitives {
 		tg := &mst.MeshTriangle{}
-		tg.Batchid = int32(len(mstMh.Materials))
+		tg.Batchid = int32(*ps.Material)
 		g.transMaterial(doc, mstMh, *ps.Material)
 		acc := doc.Accessors[int(*ps.Indices)]
 		faceBuff = doc.Buffers[int(doc.BufferViews[int(*acc.BufferView)].Buffer)]
@@ -148,6 +150,9 @@ func (g *GltfToMst) transMesh(doc *gltf.Document, mstMh *mst.Mesh, mh *gltf.Mesh
 }
 
 func (g *GltfToMst) transMaterial(doc *gltf.Document, mstMh *mst.Mesh, id uint32) {
+	if _, ok := g.mtlMap[id]; ok {
+		return
+	}
 	mt := doc.Materials[id]
 	mtl := &mst.PbrMaterial{}
 	mtl.Emissive[0] = byte(mt.EmissiveFactor[0] * 255)
@@ -190,6 +195,7 @@ func (g *GltfToMst) transMaterial(doc *gltf.Document, mstMh *mst.Mesh, id uint32
 		}
 	}
 	mstMh.Materials = append(mstMh.Materials, mtl)
+	g.mtlMap[id] = true
 }
 
 func (g *GltfToMst) decodeImage(mime string, rd io.Reader) (*mst.Texture, error) {

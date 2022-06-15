@@ -15,8 +15,8 @@ func TestGlb(t *testing.T) {
 
 func TestObj(t *testing.T) {
 	g := GltfToMst{}
-	mh, _, _ := g.Convert("/home/hj/workspace/flywave-server/data/20220613/tenants/11pwoj34e3gwbfk5z7z1gjao3h/users/3t8w9qsariym9ji1jws39w6h5w/ohm7p7yzkbnz9prieotjkudhiw/model_hill_0.mst_preview.glb")
-	f, _ := os.Create("/home/hj/workspace/flywave-server/data/20220613/tenants/11pwoj34e3gwbfk5z7z1gjao3h/users/3t8w9qsariym9ji1jws39w6h5w/ohm7p7yzkbnz9prieotjkudhiw/model_hill_0.mst_exchange.mst")
+	mh, _, _ := g.Convert("/home/hj/snap/dukto/16/model_hill_1.glb")
+	f, _ := os.Create("/home/hj/snap/dukto/16/model_hill_1.mst_exchange.mst")
 	mst.MeshMarshal(f, mh)
 }
 
@@ -29,11 +29,11 @@ func TestObjTomst(t *testing.T) {
 }
 
 func TestObjTomst2(t *testing.T) {
-	f1, _ := os.Open("/home/hj/snap/dukto/16/model_11_12 (2).mst")
+	f1, _ := os.Open("/tmp/2426425825/model_11_12.mst_exchange.mst")
 	mh := mst.MeshUnMarshal(f1)
 	doc, _ := mst.MstToGltf([]*mst.Mesh{mh})
 	glftbts, _ := mst.GetGltfBinary(doc, 8)
-	ph2 := "/home/hj/snap/dukto/16/model_11_12 (2).mst.glb"
+	ph2 := "/tmp/2426425825/model_11_12.mst_exchange.mst.glb"
 	f, _ := os.Create(ph2)
 	f.Write(glftbts)
 	f.Close()
