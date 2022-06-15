@@ -83,6 +83,7 @@ func (g *GltfToMst) transMesh(doc *gltf.Document, mstMh *mst.Mesh, mh *gltf.Mesh
 	var texView *gltf.BufferView
 	var nlBuff *gltf.Buffer
 	var nlView *gltf.BufferView
+	mstMh.Materials = make([]mst.MeshMaterial, len(doc.Materials))
 	for _, ps := range mh.Primitives {
 		tg := &mst.MeshTriangle{}
 		tg.Batchid = int32(*ps.Material)
@@ -194,7 +195,7 @@ func (g *GltfToMst) transMaterial(doc *gltf.Document, mstMh *mst.Mesh, id uint32
 			mtl.TextureMaterial.Texture = tex
 		}
 	}
-	mstMh.Materials = append(mstMh.Materials, mtl)
+	mstMh.Materials[id] = mtl
 	g.mtlMap[id] = true
 }
 
