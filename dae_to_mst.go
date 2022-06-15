@@ -25,9 +25,9 @@ type DaeToMst struct {
 
 func (cv *DaeToMst) Convert(path string) (*mst.Mesh, *[6]float64, error) {
 	mesh := mst.NewMesh()
-	var insts []*mst.InstanceMst
+	var insts []*mst.InstanceMesh
 	ext := dvec3.MinBox
-	instMp := make(map[string]*mst.InstanceMst)
+	instMp := make(map[string]*mst.InstanceMesh)
 
 	file, err := os.Open(path)
 	if err != nil {
@@ -90,11 +90,11 @@ func (cv *DaeToMst) Convert(path string) (*mst.Mesh, *[6]float64, error) {
 								for i, g := range nd2.InstanceGeometry {
 									geoId := g.Url.GetId()
 									isInstGeomey[geoId] = true
-									var inst *mst.InstanceMst
+									var inst *mst.InstanceMesh
 									var ok bool
 									if inst, ok = instMp[g.Url.GetId()]; !ok {
 										bbx := cv.convertMesh(daeGeoMap[geoId], mesh, collada, geomats[i])
-										inst = &mst.InstanceMst{MeshNodeId: uint32(len(mesh.Nodes)), BBox: bbx.Array()}
+										inst = &mst.InstanceMesh{BBox: bbx.Array()}
 										instMp[geoId] = inst
 									}
 									mats := getNodeTransform(nd)
