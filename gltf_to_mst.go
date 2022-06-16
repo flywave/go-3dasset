@@ -46,7 +46,7 @@ func (g *GltfToMst) Convert(path string) (*mst.Mesh, *[6]float64, error) {
 			isInstance[*nd.Mesh] = false
 		}
 	}
-
+	mesh.Materials = make([]mst.MeshMaterial, len(doc.Materials))
 	instMp := make(map[uint32]*mst.InstanceMesh)
 	for _, nd := range doc.Nodes {
 		meshId := *nd.Mesh
@@ -83,7 +83,6 @@ func (g *GltfToMst) transMesh(doc *gltf.Document, mstMh *mst.Mesh, mh *gltf.Mesh
 	var texView *gltf.BufferView
 	var nlBuff *gltf.Buffer
 	var nlView *gltf.BufferView
-	mstMh.Materials = make([]mst.MeshMaterial, len(doc.Materials))
 	for _, ps := range mh.Primitives {
 		tg := &mst.MeshTriangle{}
 		tg.Batchid = int32(*ps.Material)

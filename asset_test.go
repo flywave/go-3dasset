@@ -15,8 +15,8 @@ func TestGlb(t *testing.T) {
 
 func TestObj(t *testing.T) {
 	g := GltfToMst{}
-	mh, _, _ := g.Convert("/home/hj/snap/dukto/16/model_hill_1.glb")
-	f, _ := os.Create("/home/hj/snap/dukto/16/model_hill_1.mst_exchange.mst")
+	mh, _, _ := g.Convert("/home/hj/snap/dukto/16/model_11_12.glb")
+	f, _ := os.Create("/home/hj/snap/dukto/16/model_11_12.mst_exchange.mst")
 	mst.MeshMarshal(f, mh)
 }
 
