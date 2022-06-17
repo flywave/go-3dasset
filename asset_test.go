@@ -57,9 +57,9 @@ func TestGltf4(t *testing.T) {
 	ph := "/home/hj/workspace/flywave-mesh/data/test/test.obj"
 	ots := ObjToMst{}
 	mh, _, _ := ots.Convert(ph)
-	// ph1 := "/home/hj/workspace/flywave-mesh/data/test/test.mst"
-	// f1, _ := os.Create(ph1)
-	// mst.MeshMarshal(f1, mh)
+	ph1 := "/home/hj/workspace/flywave-mesh/data/test/test.mst"
+	f1, _ := os.Create(ph1)
+	mst.MeshMarshal(f1, mh)
 
 	doc, _ := mst.MstToGltf([]*mst.Mesh{mh})
 	glftbts, _ := mst.GetGltfBinary(doc, 8)
