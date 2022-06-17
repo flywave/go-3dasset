@@ -29,27 +29,42 @@ func (obj *ObjToMst) Convert(path string) (*mst.Mesh, *[6]float64, error) {
 	mtlGroup := make(map[uint32]int)
 	gmap := make(map[uint32]int)
 
-	for _, fg := range loader.FaceGroup {
-		mtg := &mst.MeshTriangle{}
-		first := fg[0]
-		if loader.Triangles != nil {
-			for i := 0; i < fg[1]; i++ {
-				t := &loader.Triangles[first+i]
-				obj.addTrigToMeshNode(mtg, t, meshNode, mtlGroup, gmap, &ext)
+	meshNode.FaceGroup = make([]*mst.MeshTriangle, len(loader.Materials))
+
+	if loader.Triangles != nil {
+
+		for i := 0; i < len(loader.Triangles); i++ {
+			t := &loader.Triangles[i]
+			mtlId := t.Mtl
+			if int32(mtlId) < 0 {
+				mtlId = 0
 			}
-		} else if loader.Triarray != nil {
-			for i := 0; i < fg[1]; i++ {
-				t, er := loader.Triarray.GetTriangle(first + i)
-				if er != nil {
-					return nil, nil, er
-				}
-				obj.addTrigToMeshNode(mtg, &t, meshNode, mtlGroup, gmap, &ext)
+			mtg := meshNode.FaceGroup[mtlId]
+			if mtg == nil {
+				mtg = &mst.MeshTriangle{Batchid: int32(mtlId)}
+				meshNode.FaceGroup[mtlId] = mtg
+				mtlGroup[mtlId] = int(t.Tex)
 			}
+			obj.addTrigToMeshNode(mtg, t, meshNode, gmap, &ext)
 		}
-		if mtg.Batchid == -1 {
-			mtg.Batchid = 0
+	} else if loader.Triarray != nil {
+		for i := 0; i < int(loader.Triarray.Size()); i++ {
+			t, er := loader.Triarray.GetTriangle(i)
+			if er != nil {
+				return nil, nil, er
+			}
+			mtlId := t.Mtl
+			if int32(mtlId) < 0 {
+				mtlId = 0
+			}
+			mtg := meshNode.FaceGroup[mtlId]
+			if mtg == nil {
+				mtg = &mst.MeshTriangle{Batchid: int32(mtlId)}
+				meshNode.FaceGroup[mtlId] = mtg
+				mtlGroup[mtlId] = int(t.Tex)
+			}
+			obj.addTrigToMeshNode(mtg, &t, meshNode, gmap, &ext)
 		}
-		meshNode.FaceGroup = append(meshNode.FaceGroup, mtg)
 	}
 
 	mesh.Nodes = append(mesh.Nodes, meshNode)
@@ -58,10 +73,10 @@ func (obj *ObjToMst) Convert(path string) (*mst.Mesh, *[6]float64, error) {
 			texMtl := &mst.TextureMaterial{}
 			texMtl.Color = mtl.Color
 			texMtl.Transparency = 1 - mtl.Opacity
-			if mtl.Mode == fmesh.TEXTURE|fmesh.COLOR {
+			texId := mtlGroup[uint32(i)]
+			if mtl.Mode == fmesh.TEXTURE|fmesh.COLOR && texId >= 0 {
 				texMtl = &mst.TextureMaterial{}
 				var tex *fmesh.Texture
-				texId := mtlGroup[uint32(i)]
 				if loader.Textures != nil {
 					tex = loader.Textures[texId]
 				} else {
@@ -114,7 +129,7 @@ func (obj *ObjToMst) Convert(path string) (*mst.Mesh, *[6]float64, error) {
 	return mesh, ext.Array(), nil
 }
 
-func (obj *ObjToMst) addTrigToMeshNode(mrg *mst.MeshTriangle, trg *fmesh.Triangle, nd *mst.MeshNode, mtlGroup map[uint32]int, groupmap map[uint32]int, ext *dvec3.Box) {
+func (obj *ObjToMst) addTrigToMeshNode(mrg *mst.MeshTriangle, trg *fmesh.Triangle, nd *mst.MeshNode, groupmap map[uint32]int, ext *dvec3.Box) {
 	v0 := &trg.Vertices[0]
 	v1 := &trg.Vertices[1]
 	v2 := &trg.Vertices[2]

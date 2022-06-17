@@ -54,13 +54,17 @@ func TestGltf3(t *testing.T) {
 }
 
 func TestGltf4(t *testing.T) {
-	ph := "/home/hj/snap/dukto/16/model_hill_1.mst.obj"
+	ph := "/home/hj/workspace/flywave-mesh/data/test/test.obj"
 	ots := ObjToMst{}
 	mh, _, _ := ots.Convert(ph)
+	// ph1 := "/home/hj/workspace/flywave-mesh/data/test/test.mst"
+	// f1, _ := os.Create(ph1)
+	// mst.MeshMarshal(f1, mh)
+
 	doc, _ := mst.MstToGltf([]*mst.Mesh{mh})
 	glftbts, _ := mst.GetGltfBinary(doc, 8)
-	ph2 := "/home/hj/snap/dukto/16/model_hill_1.mst.glb"
-	f, _ := os.Create(ph2)
-	f.Write(glftbts)
-	f.Close()
+	ph2 := "/home/hj/workspace/flywave-mesh/data/test/test.glb"
+	f2, _ := os.Create(ph2)
+	f2.Write(glftbts)
+	f2.Close()
 }
