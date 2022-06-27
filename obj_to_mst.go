@@ -67,6 +67,14 @@ func (obj *ObjToMst) Convert(path string) (*mst.Mesh, *[6]float64, error) {
 		}
 	}
 
+	var ng []*mst.MeshTriangle
+	for _, fg := range meshNode.FaceGroup {
+		if fg != nil {
+			ng = append(ng, fg)
+		}
+	}
+	meshNode.FaceGroup = ng
+
 	mesh.Nodes = append(mesh.Nodes, meshNode)
 	if len(loader.Materials) > 0 {
 		for i, mtl := range loader.Materials {
