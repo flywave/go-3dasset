@@ -13,7 +13,8 @@ import (
 
 	mst "github.com/flywave/go-mst"
 	dmat "github.com/flywave/go3d/float64/mat4"
-	dvec4 "github.com/flywave/go3d/float64/vec4"
+	"github.com/flywave/go3d/float64/quaternion"
+	dvec3 "github.com/flywave/go3d/float64/vec3"
 
 	"github.com/flywave/go3d/vec2"
 	"github.com/flywave/go3d/vec3"
@@ -26,11 +27,12 @@ var (
 )
 
 type GltfToMst struct {
-	mtlMap map[uint32]bool
+	mtlMap        map[uint32]map[uint32]bool
+	currentMeshId uint32
 }
 
 func (g *GltfToMst) Convert(path string) (*mst.Mesh, *[6]float64, error) {
-	g.mtlMap = make(map[uint32]bool)
+	g.mtlMap = make(map[uint32]map[uint32]bool)
 	mesh := mst.NewMesh()
 	bbx := &[6]float64{}
 	doc, err := gltf.Open(path)
@@ -49,21 +51,24 @@ func (g *GltfToMst) Convert(path string) (*mst.Mesh, *[6]float64, error) {
 	mesh.Materials = make([]mst.MeshMaterial, len(doc.Materials))
 	instMp := make(map[uint32]*mst.InstanceMesh)
 	for _, nd := range doc.Nodes {
-		meshId := *nd.Mesh
-		if v := isInstance[meshId]; !v {
-			bx := g.transMesh(doc, mesh, doc.Meshes[meshId])
+		g.currentMeshId = *nd.Mesh
+		if v := isInstance[g.currentMeshId]; !v {
+			bx := g.transMesh(doc, mesh, doc.Meshes[g.currentMeshId])
 
 			addPoint(bbx, &[3]float64{bx[0], bx[1], bx[2]})
 			addPoint(bbx, &[3]float64{bx[3], bx[4], bx[5]})
 		} else {
 			var inst *mst.InstanceMesh
 			var ok bool
-			if inst, ok = instMp[meshId]; !ok {
-				bx := g.transMesh(doc, mesh, doc.Meshes[meshId])
-				inst = &mst.InstanceMesh{BBox: bx}
-				instMp[meshId] = inst
+			if inst, ok = instMp[g.currentMeshId]; !ok {
+				g.mtlMap[g.currentMeshId] = make(map[uint32]bool)
+				instMh := mst.NewMesh()
+				bx := g.transMesh(doc, instMh, doc.Meshes[g.currentMeshId])
+				inst = &mst.InstanceMesh{BBox: bx, Mesh: &instMh.BaseMesh}
+				instMp[g.currentMeshId] = inst
+
 			}
-			inst.Transfors = append(inst.Transfors, toMat(nd.Matrix))
+			inst.Transfors = append(inst.Transfors, toMat(nd))
 		}
 	}
 	for _, v := range instMp {
@@ -85,7 +90,7 @@ func (g *GltfToMst) transMesh(doc *gltf.Document, mstMh *mst.Mesh, mh *gltf.Mesh
 	var nlView *gltf.BufferView
 	for _, ps := range mh.Primitives {
 		tg := &mst.MeshTriangle{}
-		tg.Batchid = int32(*ps.Material)
+		tg.Batchid = int32(len(mstMh.Materials))
 		g.transMaterial(doc, mstMh, *ps.Material)
 		acc := doc.Accessors[int(*ps.Indices)]
 		faceBuff = doc.Buffers[int(doc.BufferViews[int(*acc.BufferView)].Buffer)]
@@ -194,8 +199,8 @@ func (g *GltfToMst) transMaterial(doc *gltf.Document, mstMh *mst.Mesh, id uint32
 			mtl.TextureMaterial.Texture = tex
 		}
 	}
-	mstMh.Materials[id] = mtl
-	g.mtlMap[id] = true
+	mstMh.Materials = append(mstMh.Materials, mtl)
+	g.mtlMap[g.currentMeshId][id] = true
 }
 
 func (g *GltfToMst) decodeImage(mime string, rd io.Reader) (*mst.Texture, error) {
@@ -231,13 +236,11 @@ func (g *GltfToMst) decodeImage(mime string, rd io.Reader) (*mst.Texture, error)
 	return nil, errors.New("not support image type")
 }
 
-func toMat(mt [16]float32) *dmat.T {
-	m := &dmat.T{}
-	m[0] = dvec4.T{float64(mt[0]), float64(mt[1]), float64(mt[2]), float64(mt[3])}
-	m[1] = dvec4.T{float64(mt[4]), float64(mt[5]), float64(mt[6]), float64(mt[7])}
-	m[2] = dvec4.T{float64(mt[8]), float64(mt[9]), float64(mt[10]), float64(mt[11])}
-	m[3] = dvec4.T{float64(mt[12]), float64(mt[13]), float64(mt[14]), float64(mt[15])}
-	return m
+func toMat(nd *gltf.Node) *dmat.T {
+	sc := dvec3.T{float64(nd.Scale[0]), float64(nd.Scale[1]), float64(nd.Scale[2])}
+	tra := dvec3.T{float64(nd.Translation[0]), float64(nd.Translation[1]), float64(nd.Translation[2])}
+	rot := quaternion.T{float64(nd.Rotation[0]), float64(nd.Rotation[1]), float64(nd.Rotation[2]), float64(nd.Rotation[3])}
+	return dmat.Compose(&tra, &rot, &sc)
 }
 
 func addPoint(bx *[6]float64, p *[3]float64) {
