@@ -48,13 +48,12 @@ func (g *GltfToMst) Convert(path string) (*mst.Mesh, *[6]float64, error) {
 			isInstance[*nd.Mesh] = false
 		}
 	}
-	mesh.Materials = make([]mst.MeshMaterial, len(doc.Materials))
 	instMp := make(map[uint32]*mst.InstanceMesh)
 	for _, nd := range doc.Nodes {
 		g.currentMeshId = *nd.Mesh
 		if v := isInstance[g.currentMeshId]; !v {
+			g.mtlMap[g.currentMeshId] = make(map[uint32]bool)
 			bx := g.transMesh(doc, mesh, doc.Meshes[g.currentMeshId])
-
 			addPoint(bbx, &[3]float64{bx[0], bx[1], bx[2]})
 			addPoint(bbx, &[3]float64{bx[3], bx[4], bx[5]})
 		} else {
@@ -155,7 +154,7 @@ func (g *GltfToMst) transMesh(doc *gltf.Document, mstMh *mst.Mesh, mh *gltf.Mesh
 }
 
 func (g *GltfToMst) transMaterial(doc *gltf.Document, mstMh *mst.Mesh, id uint32) {
-	if _, ok := g.mtlMap[id]; ok {
+	if v, ok := g.mtlMap[g.currentMeshId][id]; ok && v {
 		return
 	}
 	mt := doc.Materials[id]

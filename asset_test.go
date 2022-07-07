@@ -15,9 +15,14 @@ func TestGlb(t *testing.T) {
 
 func TestObj(t *testing.T) {
 	g := GltfToMst{}
-	mh, _, _ := g.Convert("/home/hj/snap/dukto/16/model_11_12.glb")
-	f, _ := os.Create("/home/hj/snap/dukto/16/model_11_12.mst_exchange.mst")
+	mh, _, _ := g.Convert("/home/hj/workspace/flywave-mesh-editor/data/cmps/out_79_88_tower_0.glb")
+	f, _ := os.Create("/home/hj/workspace/flywave-mesh-editor/data/out_79_88_tower_0_copy.mst")
 	mst.MeshMarshal(f, mh)
+}
+
+func TestObj2(t *testing.T) {
+	f, _ := os.Open("/home/hj/workspace/flywave-mesh-editor/data/out_79_88_tower_0_copy.mst")
+	mst.MeshUnMarshal(f)
 }
 
 func TestObjTomst(t *testing.T) {
