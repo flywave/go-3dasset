@@ -32,14 +32,17 @@ type GltfToMst struct {
 }
 
 func (g *GltfToMst) Convert(path string) (*mst.Mesh, *[6]float64, error) {
-	g.mtlMap = make(map[uint32]map[uint32]bool)
-	mesh := mst.NewMesh()
-	bbx := &[6]float64{}
 	doc, err := gltf.Open(path)
 	if err != nil {
 		return nil, nil, err
 	}
+	return g.ConvertFromDoc(doc)
+}
 
+func (g *GltfToMst) ConvertFromDoc(doc *gltf.Document) (*mst.Mesh, *[6]float64, error) {
+	g.mtlMap = make(map[uint32]map[uint32]bool)
+	mesh := mst.NewMesh()
+	bbx := &[6]float64{}
 	isInstance := make(map[uint32]bool)
 	for _, nd := range doc.Nodes {
 		if _, ok := isInstance[*nd.Mesh]; ok {
