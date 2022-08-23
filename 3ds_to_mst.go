@@ -15,8 +15,9 @@ import (
 )
 
 type ThreeDsToMst struct {
-	texId   int
-	baseDir string
+	texId        int
+	backup_texId int
+	baseDir      string
 }
 
 func (cv *ThreeDsToMst) Convert(path string) (*mst.Mesh, *[6]float64, error) {
@@ -44,9 +45,13 @@ func (cv *ThreeDsToMst) Convert(path string) (*mst.Mesh, *[6]float64, error) {
 			var inst *mst.InstanceMesh
 			var ok bool
 			if inst, ok = instMp[m.Name]; !ok {
-				bx := cv.convert3dsMesh(&m, mesh, mtls)
-				inst = &mst.InstanceMesh{BBox: bx.Array()}
+				cv.backup_texId = cv.texId
+				cv.texId = 0
+				ins_mesh := mst.NewMesh()
+				bx := cv.convert3dsMesh(&m, ins_mesh, mtls)
+				inst = &mst.InstanceMesh{BBox: bx.Array(), Mesh: &ins_mesh.BaseMesh}
 				instMp[m.Name] = inst
+				cv.texId = cv.backup_texId
 			}
 			inst.Transfors = append(inst.Transfors, cv.toMat(instsNd))
 		}

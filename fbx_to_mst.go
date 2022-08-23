@@ -12,8 +12,9 @@ import (
 )
 
 type FbxToMst struct {
-	baseDir string
-	texId   int
+	baseDir      string
+	texId        int
+	backup_texId int
 }
 
 func (cv *FbxToMst) Convert(path string) (*mst.Mesh, *[6]float64, error) {
@@ -49,9 +50,13 @@ func (cv *FbxToMst) Convert(path string) (*mst.Mesh, *[6]float64, error) {
 			var inst *mst.InstanceMesh
 			var ok bool
 			if inst, ok = instMp[meshId]; !ok {
-				bx := cv.convertMesh(mesh, mh)
-				inst = &mst.InstanceMesh{BBox: bx.Array()}
+				cv.backup_texId = cv.texId
+				cv.texId = 0
+				inst_mesh := mst.NewMesh()
+				bx := cv.convertMesh(inst_mesh, mh)
+				inst = &mst.InstanceMesh{BBox: bx.Array(), Mesh: &inst_mesh.BaseMesh}
 				instMp[meshId] = inst
+				cv.texId = cv.backup_texId
 			}
 			mtx := fbx.GetGlobalMatrix(mh)
 			inst.Transfors = append(inst.Transfors, arryToMat(mtx.ToArray()))

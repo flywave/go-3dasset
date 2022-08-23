@@ -93,8 +93,9 @@ func (cv *DaeToMst) Convert(path string) (*mst.Mesh, *[6]float64, error) {
 									var inst *mst.InstanceMesh
 									var ok bool
 									if inst, ok = instMp[g.Url.GetId()]; !ok {
-										bbx := cv.convertMesh(daeGeoMap[geoId], mesh, collada, geomats[i])
-										inst = &mst.InstanceMesh{BBox: bbx.Array()}
+										inst_mesh := mst.NewMesh()
+										bbx := cv.convertMesh(daeGeoMap[geoId], inst_mesh, collada, geomats[i])
+										inst = &mst.InstanceMesh{BBox: bbx.Array(), Mesh: &inst_mesh.BaseMesh}
 										instMp[geoId] = inst
 									}
 									mats := getNodeTransform(nd)
