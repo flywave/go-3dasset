@@ -45,6 +45,9 @@ func (g *GltfToMst) ConvertFromDoc(doc *gltf.Document) (*mst.Mesh, *[6]float64, 
 	bbx := &[6]float64{}
 	isInstance := make(map[uint32]bool)
 	for _, nd := range doc.Nodes {
+		if nd.Mesh == nil {
+			continue
+		}
 		if _, ok := isInstance[*nd.Mesh]; ok {
 			isInstance[*nd.Mesh] = true
 		} else {
@@ -53,6 +56,9 @@ func (g *GltfToMst) ConvertFromDoc(doc *gltf.Document) (*mst.Mesh, *[6]float64, 
 	}
 	instMp := make(map[uint32]*mst.InstanceMesh)
 	for _, nd := range doc.Nodes {
+		if nd.Mesh == nil {
+			continue
+		}
 		g.currentMeshId = *nd.Mesh
 		if v := isInstance[g.currentMeshId]; !v {
 			g.mtlMap[g.currentMeshId] = make(map[uint32]bool)
