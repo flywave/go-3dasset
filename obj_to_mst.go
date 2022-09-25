@@ -82,7 +82,7 @@ func (obj *ObjToMst) Convert(path string) (*mst.Mesh, *[6]float64, error) {
 			texMtl.Color = mtl.Color
 			texMtl.Transparency = 1 - mtl.Opacity
 			texId := mtlGroup[uint32(i)]
-			if mtl.Mode == fmesh.TEXTURE|fmesh.COLOR && texId >= 0 {
+			if mtl.Mode == fmesh.TEXTURE|fmesh.COLOR && int32(texId) >= 0 {
 				texMtl = &mst.TextureMaterial{}
 				var tex *fmesh.Texture
 				if loader.Textures != nil {
@@ -113,18 +113,19 @@ func (obj *ObjToMst) Convert(path string) (*mst.Mesh, *[6]float64, error) {
 				t.Repeated = tex.Repeated()
 				texMtl.Texture = t
 			}
+
 			if mtl.Type == fmesh.MTL_BASE {
 				mesh.Materials = append(mesh.Materials, texMtl)
 			} else if mtl.Type == fmesh.MTL_LAMBERT {
-				mstMtl := &mst.LambertMaterial{}
+				mstMtl := toLambert(mtl)
 				mstMtl.TextureMaterial = *texMtl
 				mesh.Materials = append(mesh.Materials, mstMtl)
 			} else if mtl.Type == fmesh.MTL_PHONG {
-				mstMtl := &mst.PhongMaterial{}
+				mstMtl := toPhone(mtl)
 				mstMtl.TextureMaterial = *texMtl
 				mesh.Materials = append(mesh.Materials, mstMtl)
 			} else if mtl.Type == fmesh.MTL_PBR {
-				mstMtl := &mst.PbrMaterial{}
+				mstMtl := toPbr(mtl)
 				mstMtl.TextureMaterial = *texMtl
 				mesh.Materials = append(mesh.Materials, mstMtl)
 			}
@@ -135,6 +136,30 @@ func (obj *ObjToMst) Convert(path string) (*mst.Mesh, *[6]float64, error) {
 		mesh.Materials = append(mesh.Materials, mstMtl)
 	}
 	return mesh, ext.Array(), nil
+}
+
+func toLambert(mtl fmesh.Material) *mst.LambertMaterial {
+	return &mst.LambertMaterial{
+		Ambient:  mtl.Ambient,
+		Diffuse:  mtl.Diffuse,
+		Emissive: mtl.Emissive,
+	}
+}
+
+func toPhone(mtl fmesh.Material) *mst.PhongMaterial {
+	return &mst.PhongMaterial{
+		LambertMaterial: *toLambert(mtl),
+		Specular:        mtl.Specular,
+		Shininess:       mtl.Shininess,
+	}
+}
+
+func toPbr(mtl fmesh.Material) *mst.PbrMaterial {
+	return &mst.PbrMaterial{
+		Emissive:  [4]byte{mtl.Emissive[0], mtl.Emissive[1], mtl.Emissive[2], 255},
+		Metallic:  mtl.Metallic,
+		Roughness: mtl.Roughness,
+	}
 }
 
 func (obj *ObjToMst) addTrigToMeshNode(mrg *mst.MeshTriangle, trg *fmesh.Triangle, nd *mst.MeshNode, groupmap map[uint32]int, ext *dvec3.Box) {
