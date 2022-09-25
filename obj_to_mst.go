@@ -115,7 +115,11 @@ func (obj *ObjToMst) Convert(path string) (*mst.Mesh, *[6]float64, error) {
 			}
 
 			if mtl.Type == fmesh.MTL_BASE {
-				mesh.Materials = append(mesh.Materials, texMtl)
+				if texMtl.Texture == nil {
+					mesh.Materials = append(mesh.Materials, &texMtl.BaseMaterial)
+				} else {
+					mesh.Materials = append(mesh.Materials, texMtl)
+				}
 			} else if mtl.Type == fmesh.MTL_LAMBERT {
 				mstMtl := toLambert(mtl)
 				mstMtl.TextureMaterial = *texMtl
