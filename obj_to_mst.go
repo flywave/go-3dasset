@@ -83,7 +83,6 @@ func (obj *ObjToMst) Convert(path string) (*mst.Mesh, *[6]float64, error) {
 			texMtl.Transparency = 1 - mtl.Opacity
 			texId := mtlGroup[uint32(i)]
 			if mtl.Mode == fmesh.TEXTURE|fmesh.COLOR && int32(texId) >= 0 {
-				texMtl = &mst.TextureMaterial{}
 				var tex *fmesh.Texture
 				if loader.Textures != nil {
 					tex = loader.Textures[texId]
@@ -160,7 +159,7 @@ func toPhone(mtl fmesh.Material) *mst.PhongMaterial {
 
 func toPbr(mtl fmesh.Material) *mst.PbrMaterial {
 	return &mst.PbrMaterial{
-		Emissive:  [4]byte{mtl.Emissive[0], mtl.Emissive[1], mtl.Emissive[2], 255},
+		Emissive:  mtl.Emissive,
 		Metallic:  mtl.Metallic,
 		Roughness: mtl.Roughness,
 	}
