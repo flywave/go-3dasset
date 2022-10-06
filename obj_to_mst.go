@@ -22,7 +22,7 @@ func (obj *ObjToMst) Convert(path string) (*mst.Mesh, *[6]float64, error) {
 	if er != nil {
 		return nil, nil, er
 	}
-	mesh := &mst.Mesh{}
+	mesh := mst.NewMesh()
 	meshNode := &mst.MeshNode{}
 
 	var err error
