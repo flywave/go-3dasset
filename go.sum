@@ -52,6 +52,8 @@ github.com/flywave/go-mapbox v0.0.0-20211214141607-a6ac10dbb5a6/go.mod h1:pQYpFq
 github.com/flywave/go-mst v0.0.0-20220617234716-522c23494404/go.mod h1:3VU4qi+ahRNfZaY0em+pt96C8v84NxlSQyomFadtE9E=
 github.com/flywave/go-mst v0.0.0-20220823014338-f7eaa7825a34 h1:GAEGFjSZrNvGZWY1581X2Y1qpk1DSjR61y5bb94yaIo=
 github.com/flywave/go-mst v0.0.0-20220823014338-f7eaa7825a34/go.mod h1:3VU4qi+ahRNfZaY0em+pt96C8v84NxlSQyomFadtE9E=
+github.com/flywave/go-mst v0.0.0-20221006020953-2aca1c646d70 h1:P723C3B/fEbM306yo34oibKtkmPszODiyUGkGS9skSw=
+github.com/flywave/go-mst v0.0.0-20221006020953-2aca1c646d70/go.mod h1:4Z8vx9dxgIXdNCd7JEaIhcwMD86dhPknQ/AbUJ8Rx1E=
 github.com/flywave/go-obj v0.0.0-20220925000332-cb9876e3c58b h1:3rdo0wo8a4Bz/5+Jf9MEKxh89W+49QBzzUGbeDW9IHE=
 github.com/flywave/go-obj v0.0.0-20220925000332-cb9876e3c58b/go.mod h1:/R2a8b3rp9GpHrSSgB5vaYgDHJaV3Vlk4izFyBwAYos=
 github.com/flywave/go-pbf v0.0.0-20210701015929-a3bdb1f6728e/go.mod h1:cfHFEG24/0hT2xCSLJb8rT/2WE8ieeIrbOJq1sql/fg=
@@ -134,6 +136,7 @@ github.com/stretchr/testify v1.7.1/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/
 github.com/twpayne/go-kml v1.5.2/go.mod h1:kz8jAiIz6FIdU2Zjce9qGlVtgFYES9vt7BTPBHf5jl4=
 github.com/twpayne/go-polyline v1.0.0/go.mod h1:ICh24bcLYBX8CknfvNPKqoTbe+eg+MX1NPyJmSBo7pU=
 github.com/twpayne/go-waypoint v0.0.0-20200706203930-b263a7f6e4e8/go.mod h1:qj5pHncxKhu9gxtZEYWypA/z097sxhFlbTyOyt9gcnU=
+github.com/xtgo/uuid v0.0.0-20140804021211-a0b114877d4c/go.mod h1:UrdRz5enIKZ63MEE3IF9l2/ebyx59GyGgPi+tICQdmM=
 github.com/yobert/alsa v0.0.0-20200618200352-d079056f5370/go.mod h1:CaowXBWOiSGWEpBBV8LoVnQTVPV4ycyviC9IBLj8dRw=
 golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2/go.mod h1:djNgcEr1/C05ACkg1iLfiJU5Ep61QUkGW8qpdssI0+w=
 golang.org/x/crypto v0.0.0-20200323165209-0ec3e9974c59/go.mod h1:LzIPMQfyMNhhGPhUkYOs5KpL4U8rLKemX1yGLhDgUto=

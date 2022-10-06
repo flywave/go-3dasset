@@ -10,7 +10,7 @@ require (
 	github.com/flywave/go-3ds v0.0.0-20210617133319-24beedbcf9db
 	github.com/flywave/go-3jsbin v0.0.0-20211116000724-4e27991d25d8 // indirect
 	github.com/flywave/go-collada v0.0.0-20210617100142-f02e95c083a9
-	github.com/flywave/go-mst v0.0.0-20220823014338-f7eaa7825a34
+	github.com/flywave/go-mst v0.0.0-20221006020953-2aca1c646d70
 	github.com/flywave/go3d v0.0.0-20220728100441-e65a6f6f7288
 	github.com/flywave/ofbx v0.1.1-0.20210621005150-08292dcb7ef2
 	github.com/ftrvxmtrx/tga v0.0.0-20150524081124-bd8e8d5be13a
