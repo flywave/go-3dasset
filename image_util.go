@@ -12,7 +12,6 @@ import (
 
 	"github.com/chai2010/tiff"
 	mst "github.com/flywave/go-mst"
-	"github.com/ftrvxmtrx/tga"
 	"golang.org/x/image/bmp"
 )
 
@@ -53,8 +52,6 @@ func readImage(rd io.Reader, ft string) (image.Image, error) {
 	switch ft {
 	case "jpeg", "jpg":
 		return jpeg.Decode(rd)
-	case "tga":
-		return tga.Decode(rd)
 	case "png":
 		return png.Decode(rd)
 	case "gif":
