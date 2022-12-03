@@ -78,8 +78,10 @@ func (cv *ThreeDsToMst) convert3dsMesh(m *tds.Mesh, mstMesh *mst.Mesh, mtls []td
 		nd.Vertices = append(nd.Vertices, vec3.T{float32(vt[0]), float32(vt[1]), float32(vt[2])})
 	}
 
+	repete := false
 	for _, v := range m.Texcos {
 		nd.TexCoords = append(nd.TexCoords, vec2.T{v[0], v[1]})
+		repete = repete || v[0] > 1.1 || v[1] > 1.1
 	}
 
 	tgMap := make(map[int32]*mst.MeshTriangle)
@@ -89,7 +91,7 @@ func (cv *ThreeDsToMst) convert3dsMesh(m *tds.Mesh, mstMesh *mst.Mesh, mtls []td
 			tg = &mst.MeshTriangle{Batchid: int32(len(mstMesh.Materials))}
 			tgMap[f.Material] = tg
 			nd.FaceGroup = append(nd.FaceGroup, tg)
-			cv.convert3dsMtl(mstMesh, &mtls[f.Material])
+			cv.convert3dsMtl(mstMesh, &mtls[f.Material], repete)
 		}
 		tg.Faces = append(tg.Faces, &mst.Face{Vertex: [3]uint32{uint32(f.Index[0]), uint32(f.Index[1]), uint32(f.Index[2])}})
 	}
@@ -97,7 +99,7 @@ func (cv *ThreeDsToMst) convert3dsMesh(m *tds.Mesh, mstMesh *mst.Mesh, mtls []td
 	return &ext
 }
 
-func (cv *ThreeDsToMst) convert3dsMtl(mesh *mst.Mesh, m *tds.Material) {
+func (cv *ThreeDsToMst) convert3dsMtl(mesh *mst.Mesh, m *tds.Material, repete bool) {
 	texMtl := &mst.PhongMaterial{}
 	mesh.Materials = append(mesh.Materials, texMtl)
 	texMtl.Color[0] = byte(m.Diffuse[0] * 255)
@@ -127,6 +129,7 @@ func (cv *ThreeDsToMst) convert3dsMtl(mesh *mst.Mesh, m *tds.Material) {
 		if err != nil {
 			return
 		}
+		t.Repeated = repete
 		cv.texId++
 		texMtl.Texture = t
 	}

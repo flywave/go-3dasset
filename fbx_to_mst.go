@@ -84,9 +84,12 @@ func (cv *FbxToMst) convertMesh(mstMh *mst.Mesh, mh *fbx.Mesh) *dvec3.Box {
 			mhNode.Normals = append(mhNode.Normals, vec3.T{float32(v[0]), float32(v[1]), float32(v[2])})
 		}
 	}
+
+	repete := false
 	if g.UVs[0] != nil {
 		for _, v := range g.UVs[0] {
 			mhNode.TexCoords = append(mhNode.TexCoords, vec2.T{float32(v[0]), float32(v[1])})
+			repete = repete || v[0] > 1.1 || v[1] > 1.1
 		}
 	}
 
@@ -98,22 +101,25 @@ func (cv *FbxToMst) convertMesh(mstMh *mst.Mesh, mh *fbx.Mesh) *dvec3.Box {
 		batchId := batchs[i]
 		bid, ok := mtlMp[batchId]
 		var gp *mst.MeshTriangle
+		f1 := uint32(oldV[i*3])
+		f2 := uint32(oldV[i*3+1])
+		f3 := uint32(oldV[i*3+2])
 		if !ok {
 			bid = int32(len(mstMh.Materials))
 			mtlMp[batchId] = bid
 			gp = &mst.MeshTriangle{Batchid: bid}
 			fgMap[bid] = gp
 			mhNode.FaceGroup = append(mhNode.FaceGroup, gp)
-			cv.convertMaterial(mstMh, mh.Materials[batchId])
+			cv.convertMaterial(mstMh, mh.Materials[batchId], repete)
 		} else {
 			gp = fgMap[bid]
 		}
-		gp.Faces = append(gp.Faces, &mst.Face{Vertex: [3]uint32{uint32(oldV[i*3]), uint32(oldV[i*3+1]), uint32(oldV[i*3+2])}})
+		gp.Faces = append(gp.Faces, &mst.Face{Vertex: [3]uint32{f1, f2, f3}})
 	}
 	return &bbx
 }
 
-func (cv *FbxToMst) convertMaterial(mstMh *mst.Mesh, mt *fbx.Material) {
+func (cv *FbxToMst) convertMaterial(mstMh *mst.Mesh, mt *fbx.Material, repete bool) {
 	mtl := &mst.PhongMaterial{}
 
 	mtl.Color[0] = byte(mt.DiffuseColor.R * 255)
@@ -144,6 +150,7 @@ func (cv *FbxToMst) convertMaterial(mstMh *mst.Mesh, mt *fbx.Material) {
 		if err != nil {
 			return
 		}
+		tex.Repeated = repete
 		mtl.Texture = tex
 		cv.texId++
 	}

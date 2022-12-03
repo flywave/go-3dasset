@@ -98,8 +98,6 @@ func (g *GltfToMst) transMesh(doc *gltf.Document, mstMh *mst.Mesh, mh *gltf.Mesh
 	var nlView *gltf.BufferView
 	for _, ps := range mh.Primitives {
 		tg := &mst.MeshTriangle{}
-		tg.Batchid = int32(len(mstMh.Materials))
-		g.transMaterial(doc, mstMh, *ps.Material)
 		acc := doc.Accessors[int(*ps.Indices)]
 		faceBuff = doc.Buffers[int(doc.BufferViews[int(*acc.BufferView)].Buffer)]
 		tg.Faces = make([]*mst.Face, int(acc.Count/3))
@@ -127,6 +125,7 @@ func (g *GltfToMst) transMesh(doc *gltf.Document, mstMh *mst.Mesh, mh *gltf.Mesh
 			}
 		}
 
+		repete := false
 		if idx, ok := ps.Attributes["TEXCOORD_0"]; ok {
 			if _, ok := accMap[idx]; !ok {
 				acc = doc.Accessors[idx]
@@ -137,6 +136,7 @@ func (g *GltfToMst) transMesh(doc *gltf.Document, mstMh *mst.Mesh, mh *gltf.Mesh
 					v := vec2.T{}
 					binary.Read(bf, binary.LittleEndian, &v)
 					mhNode.TexCoords = append(mhNode.TexCoords, v)
+					repete = repete || v[0] > 1.1 || v[1] > 1.1
 				}
 				accMap[idx] = true
 			}
@@ -157,12 +157,14 @@ func (g *GltfToMst) transMesh(doc *gltf.Document, mstMh *mst.Mesh, mh *gltf.Mesh
 			}
 		}
 		mhNode.FaceGroup = append(mhNode.FaceGroup, tg)
+		tg.Batchid = int32(len(mstMh.Materials))
+		g.transMaterial(doc, mstMh, *ps.Material, repete)
 	}
 	mstMh.Nodes = append(mstMh.Nodes, mhNode)
 	return bbx
 }
 
-func (g *GltfToMst) transMaterial(doc *gltf.Document, mstMh *mst.Mesh, id uint32) {
+func (g *GltfToMst) transMaterial(doc *gltf.Document, mstMh *mst.Mesh, id uint32, repete bool) {
 	if v, ok := g.mtlMap[g.currentMeshId][id]; ok && v {
 		return
 	}
@@ -204,6 +206,7 @@ func (g *GltfToMst) transMaterial(doc *gltf.Document, mstMh *mst.Mesh, id uint32
 		}
 		if tex != nil {
 			tex.Id = int32(texIdx)
+			tex.Repeated = repete
 			mtl.TextureMaterial.Texture = tex
 		}
 	}
