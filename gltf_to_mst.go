@@ -15,6 +15,7 @@ import (
 	dmat "github.com/flywave/go3d/float64/mat4"
 	"github.com/flywave/go3d/float64/quaternion"
 	dvec3 "github.com/flywave/go3d/float64/vec3"
+	"github.com/flywave/go3d/mat4"
 
 	"github.com/flywave/go3d/vec2"
 	"github.com/flywave/go3d/vec3"
@@ -29,6 +30,7 @@ var (
 type GltfToMst struct {
 	mtlMap        map[uint32]map[uint32]bool
 	currentMeshId uint32
+	nodeMatrix    map[uint32]mat4.T
 }
 
 func (g *GltfToMst) Convert(path string) (*mst.Mesh, *[6]float64, error) {
@@ -36,6 +38,7 @@ func (g *GltfToMst) Convert(path string) (*mst.Mesh, *[6]float64, error) {
 	if err != nil {
 		return nil, nil, err
 	}
+	g.nodeMatrix = make(map[uint32]mat4.T)
 	return g.ConvertFromDoc(doc)
 }
 
@@ -52,6 +55,7 @@ func (g *GltfToMst) ConvertFromDoc(doc *gltf.Document) (*mst.Mesh, *[6]float64, 
 			isInstance[*nd.Mesh] = true
 		} else {
 			isInstance[*nd.Mesh] = false
+			g.nodeMatrix[*nd.Mesh] = toMeshMat(nd)
 		}
 	}
 	instMp := make(map[uint32]*mst.InstanceMesh)
@@ -59,10 +63,11 @@ func (g *GltfToMst) ConvertFromDoc(doc *gltf.Document) (*mst.Mesh, *[6]float64, 
 		if nd.Mesh == nil {
 			continue
 		}
+
 		g.currentMeshId = *nd.Mesh
 		if v := isInstance[g.currentMeshId]; !v {
 			g.mtlMap[g.currentMeshId] = make(map[uint32]bool)
-			bx := g.transMesh(doc, mesh, doc.Meshes[g.currentMeshId])
+			bx := g.transMesh(doc, mesh, g.currentMeshId)
 			addPoint(bbx, &[3]float64{bx[0], bx[1], bx[2]})
 			addPoint(bbx, &[3]float64{bx[3], bx[4], bx[5]})
 		} else {
@@ -71,7 +76,7 @@ func (g *GltfToMst) ConvertFromDoc(doc *gltf.Document) (*mst.Mesh, *[6]float64, 
 			if inst, ok = instMp[g.currentMeshId]; !ok {
 				g.mtlMap[g.currentMeshId] = make(map[uint32]bool)
 				instMh := mst.NewMesh()
-				bx := g.transMesh(doc, instMh, doc.Meshes[g.currentMeshId])
+				bx := g.transMesh(doc, instMh, g.currentMeshId)
 				inst = &mst.InstanceMesh{BBox: bx, Mesh: &instMh.BaseMesh}
 				instMp[g.currentMeshId] = inst
 
@@ -85,7 +90,8 @@ func (g *GltfToMst) ConvertFromDoc(doc *gltf.Document) (*mst.Mesh, *[6]float64, 
 	return mesh, bbx, nil
 }
 
-func (g *GltfToMst) transMesh(doc *gltf.Document, mstMh *mst.Mesh, mh *gltf.Mesh) *[6]float64 {
+func (g *GltfToMst) transMesh(doc *gltf.Document, mstMh *mst.Mesh, mhid uint32) *[6]float64 {
+	mh := doc.Meshes[mhid]
 	accMap := make(map[uint32]bool)
 	mhNode := &mst.MeshNode{}
 	bbx := &[6]float64{}
@@ -97,20 +103,38 @@ func (g *GltfToMst) transMesh(doc *gltf.Document, mstMh *mst.Mesh, mh *gltf.Mesh
 	var nlBuff *gltf.Buffer
 	var nlView *gltf.BufferView
 	for _, ps := range mh.Primitives {
+		if ps.Indices == nil {
+			continue
+		}
 		tg := &mst.MeshTriangle{}
 		acc := doc.Accessors[int(*ps.Indices)]
 		faceBuff = doc.Buffers[int(doc.BufferViews[int(*acc.BufferView)].Buffer)]
 		tg.Faces = make([]*mst.Face, int(acc.Count/3))
 		faceView := doc.BufferViews[int(*acc.BufferView)]
 		bf := bytes.NewBuffer(faceBuff.Data[int(faceView.ByteOffset):int(faceView.ByteOffset+faceView.ByteLength)])
-		for i := 0; i < len(tg.Faces); i++ {
-			f := &mst.Face{}
-			binary.Read(bf, binary.LittleEndian, &f.Vertex)
-			tg.Faces[i] = f
+		if acc.ComponentType == gltf.ComponentUshort {
+			fcs := [3]uint16{}
+			for i := 0; i < len(tg.Faces); i++ {
+				f := &mst.Face{}
+				binary.Read(bf, binary.LittleEndian, &fcs)
+				f.Vertex[0] = uint32(fcs[0])
+				f.Vertex[1] = uint32(fcs[1])
+				f.Vertex[2] = uint32(fcs[2])
+				tg.Faces[i] = f
+
+			}
+		} else if acc.ComponentType == gltf.ComponentUint {
+			fcs := [3]uint32{}
+			for i := 0; i < len(tg.Faces); i++ {
+				binary.Read(bf, binary.LittleEndian, &fcs)
+				f := &mst.Face{Vertex: fcs}
+				tg.Faces[i] = f
+			}
 		}
 
 		if idx, ok := ps.Attributes["POSITION"]; ok {
 			if _, ok := accMap[idx]; !ok {
+				mat, ok := g.nodeMatrix[mhid]
 				acc = doc.Accessors[idx]
 				posView = doc.BufferViews[int(*acc.BufferView)]
 				posBuff = doc.Buffers[int(posView.Buffer)]
@@ -118,6 +142,9 @@ func (g *GltfToMst) transMesh(doc *gltf.Document, mstMh *mst.Mesh, mh *gltf.Mesh
 				for i := 0; i < int(acc.Count); i++ {
 					v := vec3.T{}
 					binary.Read(bf, binary.LittleEndian, &v)
+					if ok {
+						v = mat.MulVec3(&v)
+					}
 					mhNode.Vertices = append(mhNode.Vertices, v)
 					addPoint(bbx, &[3]float64{float64(v[0]), float64(v[1]), float64(v[2])})
 				}
@@ -160,7 +187,11 @@ func (g *GltfToMst) transMesh(doc *gltf.Document, mstMh *mst.Mesh, mh *gltf.Mesh
 		tg.Batchid = int32(len(mstMh.Materials))
 		g.transMaterial(doc, mstMh, *ps.Material, repete)
 	}
-	mstMh.Nodes = append(mstMh.Nodes, mhNode)
+
+	if len(mhNode.FaceGroup) > 0 {
+		mstMh.Nodes = append(mstMh.Nodes, mhNode)
+	}
+
 	return bbx
 }
 
@@ -252,6 +283,10 @@ func toMat(nd *gltf.Node) *dmat.T {
 	tra := dvec3.T{float64(nd.Translation[0]), float64(nd.Translation[1]), float64(nd.Translation[2])}
 	rot := quaternion.T{float64(nd.Rotation[0]), float64(nd.Rotation[1]), float64(nd.Rotation[2]), float64(nd.Rotation[3])}
 	return dmat.Compose(&tra, &rot, &sc)
+}
+
+func toMeshMat(nd *gltf.Node) mat4.T {
+	return mat4.FromArray(nd.Matrix)
 }
 
 func addPoint(bx *[6]float64, p *[3]float64) {
