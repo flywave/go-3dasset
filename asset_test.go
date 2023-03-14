@@ -15,8 +15,8 @@ func TestGlb(t *testing.T) {
 
 func TestObj(t *testing.T) {
 	g := GltfToMst{}
-	mh, _, _ := g.Convert("test/0.glb")
-	f, _ := os.Create("test/0_copy.mst")
+	mh, _, _ := g.Convert("test/2-103.glb")
+	f, _ := os.Create("test/2-103.mst")
 	mst.MeshMarshal(f, mh)
 }
 
