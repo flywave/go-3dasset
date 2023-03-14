@@ -266,7 +266,7 @@ func (g *GltfToMst) decodeImage(mime string, rd io.Reader) (*mst.Texture, error)
 		tex.Size[0] = uint64(w)
 		tex.Size[1] = uint64(h)
 		var buf []byte
-		for y := 0; y < h; y++ {
+		for y := h - 1; y >= 0; y-- {
 			for x := 0; x < w; x++ {
 				cl := img.At(x, y)
 				r, g, b, a := color.RGBAModel.Convert(cl).RGBA()
