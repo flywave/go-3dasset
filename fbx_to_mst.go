@@ -143,8 +143,11 @@ func (cv *FbxToMst) convertMaterial(mstMh *mst.Mesh, mt *fbx.Material, repete bo
 	mtl.Shininess = float32(mt.Shininess)
 	mtl.Specularity = float32(mt.SpecularFactor)
 	mstMh.Materials = append(mstMh.Materials, mtl)
-	if len(mt.Textures) > 0 {
-		_, fileName := filepath.Split(string(mt.Textures[0].GetFileName()))
+	for _, tt := range mt.Textures {
+		if tt == nil {
+			continue
+		}
+		_, fileName := filepath.Split(string(tt.GetFileName()))
 		f := filepath.Join(cv.baseDir, fileName)
 		tex, err := convertTex(f, cv.texId)
 		if err != nil {

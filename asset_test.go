@@ -73,3 +73,16 @@ func TestGltf4(t *testing.T) {
 	f2.Write(glftbts)
 	f2.Close()
 }
+
+func TestFBX(t *testing.T) {
+	ph := "/home/hj/snap/dukto/16/md/AOI.fbx"
+	ots := FbxToMst{}
+	mh, _, _ := ots.Convert(ph)
+
+	doc, _ := mst.MstToGltf([]*mst.Mesh{mh})
+	glftbts, _ := mst.GetGltfBinary(doc, 8)
+	ph2 := "test/AOI.glb"
+	f2, _ := os.Create(ph2)
+	f2.Write(glftbts)
+	f2.Close()
+}
