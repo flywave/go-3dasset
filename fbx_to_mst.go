@@ -2,9 +2,7 @@ package asset3d
 
 import (
 	"os"
-	"path"
 	"path/filepath"
-	"strings"
 
 	mst "github.com/flywave/go-mst"
 	"github.com/flywave/go3d/float64/mat4"
@@ -136,14 +134,9 @@ func (cv *FbxToMst) convertMaterial(mstMh *mst.Mesh, mt *fbx.Material, repete bo
 	mtl := &mst.PbrMaterial{Metallic: 0, Roughness: 1}
 	idx := int32(len(mstMh.Materials))
 	if mt.Textures[0] != nil {
-		// _, fileName := filepath.Split(string(tt.GetFileName()))
-		str := strings.ReplaceAll(mt.Textures[0].GetRelativeFileName().String(), "\\", "/")
-		var f string
-		if path.IsAbs(str) {
-			f = str
-		} else {
-			f = filepath.Join(cv.baseDir, str)
-		}
+		_, fileName := filepath.Split(string(mt.Textures[0].GetFileName()))
+		// str := strings.ReplaceAll(mt.Textures[0].GetRelativeFileName().String(), "\\", "/")
+		f := filepath.Join(cv.baseDir, fileName)
 
 		if midx, ok := cv.texMap[f]; ok {
 			return midx
@@ -160,14 +153,8 @@ func (cv *FbxToMst) convertMaterial(mstMh *mst.Mesh, mt *fbx.Material, repete bo
 	}
 
 	if mt.Textures[1] != nil {
-		str := strings.ReplaceAll(mt.Textures[1].GetRelativeFileName().String(), "\\", "/")
-		var f string
-		if path.IsAbs(str) {
-			f = str
-		} else {
-			f = filepath.Join(cv.baseDir, str)
-		}
-
+		_, fileName := filepath.Split(string(mt.Textures[1].GetFileName()))
+		f := filepath.Join(cv.baseDir, fileName)
 		if midx, ok := cv.texMap[f]; ok {
 			return midx
 		}
