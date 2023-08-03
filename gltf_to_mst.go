@@ -15,7 +15,6 @@ import (
 	dmat "github.com/flywave/go3d/float64/mat4"
 	"github.com/flywave/go3d/float64/quaternion"
 	dvec3 "github.com/flywave/go3d/float64/vec3"
-	"github.com/flywave/go3d/mat4"
 
 	"github.com/flywave/go3d/vec2"
 	"github.com/flywave/go3d/vec3"
@@ -30,7 +29,7 @@ var (
 type GltfToMst struct {
 	mtlMap        map[uint32]map[uint32]bool
 	currentMeshId uint32
-	nodeMatrix    map[uint32]mat4.T
+	nodeMatrix    map[uint32]*dmat.T
 }
 
 func (g *GltfToMst) Convert(path string) (*mst.Mesh, *[6]float64, error) {
@@ -38,7 +37,7 @@ func (g *GltfToMst) Convert(path string) (*mst.Mesh, *[6]float64, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	g.nodeMatrix = make(map[uint32]mat4.T)
+	g.nodeMatrix = make(map[uint32]*dmat.T)
 	return g.ConvertFromDoc(doc)
 }
 
@@ -55,7 +54,7 @@ func (g *GltfToMst) ConvertFromDoc(doc *gltf.Document) (*mst.Mesh, *[6]float64, 
 			isInstance[*nd.Mesh] = true
 		} else {
 			isInstance[*nd.Mesh] = false
-			g.nodeMatrix[*nd.Mesh] = toMeshMat(nd)
+			g.nodeMatrix[*nd.Mesh] = toMat(nd)
 		}
 	}
 	instMp := make(map[uint32]*mst.InstanceMesh)
@@ -146,7 +145,9 @@ func (g *GltfToMst) transMesh(doc *gltf.Document, mstMh *mst.Mesh, mhid uint32) 
 					v := vec3.T{}
 					binary.Read(bf, binary.LittleEndian, &v)
 					if ok {
-						v = mat.MulVec3(&v)
+						dv := dvec3.T{float64(v[0]), float64(v[1]), float64(v[2])}
+						dv = mat.MulVec3(&dv)
+						v = vec3.T{float32(dv[0]), float32(dv[1]), float32(dv[2])}
 					}
 					mhNode.Vertices = append(mhNode.Vertices, v)
 					addPoint(bbx, &[3]float64{float64(v[0]), float64(v[1]), float64(v[2])})
@@ -244,6 +245,33 @@ func (g *GltfToMst) transMaterial(doc *gltf.Document, mstMh *mst.Mesh, id uint32
 			mtl.TextureMaterial.Texture = tex
 		}
 	}
+
+	if mt.NormalTexture != nil {
+		norlTexInfo := mt.NormalTexture
+		texIdx := norlTexInfo.Index
+		src := *doc.Textures[int(*texIdx)].Source
+		img := doc.Images[int(src)]
+		var tex *mst.Texture
+		var buf io.Reader
+		var err error
+		if img.BufferView != nil {
+			view := doc.BufferViews[int(*img.BufferView)]
+			bufferIdx := view.Buffer
+			buffer := doc.Buffers[int(bufferIdx)]
+			bt := buffer.Data[view.ByteOffset : view.ByteOffset+view.ByteLength]
+			buf = bytes.NewBuffer(bt)
+		}
+		tex, err = g.decodeImage(img.MimeType, buf)
+		if err != nil {
+			return
+		}
+		if tex != nil {
+			tex.Id = int32(*texIdx)
+			tex.Repeated = repete
+			mtl.TextureMaterial.Normal = tex
+		}
+	}
+
 	mstMh.Materials = append(mstMh.Materials, mtl)
 	g.mtlMap[g.currentMeshId][id] = true
 }
@@ -286,10 +314,6 @@ func toMat(nd *gltf.Node) *dmat.T {
 	tra := dvec3.T{float64(nd.Translation[0]), float64(nd.Translation[1]), float64(nd.Translation[2])}
 	rot := quaternion.T{float64(nd.Rotation[0]), float64(nd.Rotation[1]), float64(nd.Rotation[2]), float64(nd.Rotation[3])}
 	return dmat.Compose(&tra, &rot, &sc)
-}
-
-func toMeshMat(nd *gltf.Node) mat4.T {
-	return mat4.FromArray(nd.Matrix)
 }
 
 func addPoint(bx *[6]float64, p *[3]float64) {

@@ -35,9 +35,10 @@ func convertTex(path string, texId int) (*mst.Texture, error) {
 		for x := 0; x < bd.Dx(); x++ {
 			cl := img.At(x, y)
 			r, g, b, a := color.RGBAModel.Convert(cl).RGBA()
-			buf = append(buf, byte(r), byte(g), byte(b), byte(a))
+			buf = append(buf, byte(r&0xff), byte(g&0xff), byte(b&0xff), byte(a&0xff))
 		}
 	}
+	f.Close()
 
 	t := &mst.Texture{}
 	t.Id = int32(texId)

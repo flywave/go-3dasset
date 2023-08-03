@@ -2,9 +2,12 @@ package asset3d
 
 import (
 	"os"
+	"path"
 	"path/filepath"
+	"strings"
 
 	mst "github.com/flywave/go-mst"
+	"github.com/flywave/go3d/float64/mat4"
 	dvec3 "github.com/flywave/go3d/float64/vec3"
 	"github.com/flywave/go3d/vec2"
 	"github.com/flywave/go3d/vec3"
@@ -15,6 +18,7 @@ type FbxToMst struct {
 	baseDir      string
 	texId        int
 	backup_texId int
+	texMap       map[string]int32
 }
 
 func (cv *FbxToMst) Convert(path string) (*mst.Mesh, *[6]float64, error) {
@@ -29,6 +33,7 @@ func (cv *FbxToMst) Convert(path string) (*mst.Mesh, *[6]float64, error) {
 	if er != nil {
 		return nil, nil, er
 	}
+	cv.texMap = map[string]int32{}
 	cv.baseDir = filepath.Dir(path)
 	isInstance := make(map[uint64]bool)
 	instMp := make(map[uint64]*mst.InstanceMesh)
@@ -74,87 +79,112 @@ func (cv *FbxToMst) convertMesh(mstMh *mst.Mesh, mh *fbx.Mesh) *dvec3.Box {
 	mhNode := &mst.MeshNode{}
 	bbx := dvec3.MinBox
 	g := mh.Geometry
-	for _, v := range g.Vertices {
-		vt := vec3.T{float32(v[0]), float32(v[1]), float32(v[2])}
-		mhNode.Vertices = append(mhNode.Vertices, vt)
-		bbx.Extend((*dvec3.T)(&v))
+	mtx := fbx.GetGlobalMatrix(mh)
+
+	repete := false
+	batchs := g.Materials
+
+	if g.UVs[0] != nil {
+		for _, v := range g.UVs[0] {
+			mhNode.TexCoords = append(mhNode.TexCoords, vec2.T{float32(v[0]), float32(v[1])})
+			repete = repete || v[0] > 1.1 || v[1] > 1.1 || v[0] < 0 || v[1] < 0
+		}
 	}
+
 	if g.Normals != nil {
 		for _, v := range g.Normals {
 			mhNode.Normals = append(mhNode.Normals, vec3.T{float32(v[0]), float32(v[1]), float32(v[2])})
 		}
 	}
 
-	repete := false
-	if g.UVs[0] != nil {
-		for _, v := range g.UVs[0] {
-			mhNode.TexCoords = append(mhNode.TexCoords, vec2.T{float32(v[0]), float32(v[1])})
-			repete = repete || v[0] > 1.1 || v[1] > 1.1
-		}
-	}
-
-	oldV := g.GetOldVerts()
-	batchs := g.Materials
 	fgMap := make(map[int32]*mst.MeshTriangle)
 	mtlMp := make(map[int]int32)
+	if len(batchs) == 0 {
+		batchs = make([]int, len(g.Faces))
+	}
+
 	for i := 0; i < len(batchs); i++ {
 		batchId := batchs[i]
 		bid, ok := mtlMp[batchId]
 		var gp *mst.MeshTriangle
-		f1 := uint32(oldV[i*3])
-		f2 := uint32(oldV[i*3+1])
-		f3 := uint32(oldV[i*3+2])
+
 		if !ok {
-			bid = int32(len(mstMh.Materials))
+			bid = cv.convertMaterial(mstMh, mh.Materials[batchId], repete)
 			mtlMp[batchId] = bid
 			gp = &mst.MeshTriangle{Batchid: bid}
 			fgMap[bid] = gp
 			mhNode.FaceGroup = append(mhNode.FaceGroup, gp)
-			cv.convertMaterial(mstMh, mh.Materials[batchId], repete)
 		} else {
 			gp = fgMap[bid]
 		}
-		gp.Faces = append(gp.Faces, &mst.Face{Vertex: [3]uint32{f1, f2, f3}})
+		for _, f := range g.Faces[i] {
+			v := g.Vertices[f]
+			vt := vec3.T{float32(v[0]), float32(v[1]), float32(v[2])}
+			mt := mat4.FromArray(mtx.ToArray())
+			dvt := mt.MulVec3(&dvec3.T{float64(vt[0]), float64(vt[1]), float64(vt[2])})
+			mhNode.Vertices = append(mhNode.Vertices, vec3.T{float32(dvt[0]), float32(dvt[1]), float32(dvt[2])})
+			bbx.Extend((*dvec3.T)(&v))
+		}
+		gp.Faces = append(gp.Faces, &mst.Face{Vertex: [3]uint32{uint32(i * 3), uint32(i*3 + 1), uint32(i*3 + 2)}})
 	}
+
+	mstMh.Nodes = append(mstMh.Nodes, mhNode)
 	return &bbx
 }
 
-func (cv *FbxToMst) convertMaterial(mstMh *mst.Mesh, mt *fbx.Material, repete bool) {
-	mtl := &mst.PhongMaterial{}
-
-	mtl.Color[0] = byte(mt.DiffuseColor.R * 255)
-	mtl.Color[1] = byte(mt.DiffuseColor.G * 255)
-	mtl.Color[2] = byte(mt.DiffuseColor.B * 255)
-
-	mtl.Diffuse = mtl.Color
-
-	mtl.Emissive[0] = byte(mt.EmissiveColor.R * 255)
-	mtl.Emissive[1] = byte(mt.EmissiveColor.G * 255)
-	mtl.Emissive[2] = byte(mt.EmissiveColor.B * 255)
-
-	mtl.Ambient[0] = byte(mt.AmbientColor.R * 255)
-	mtl.Ambient[1] = byte(mt.AmbientColor.G * 255)
-	mtl.Ambient[2] = byte(mt.AmbientColor.B * 255)
-
-	mtl.Specular[0] = byte(mt.SpecularColor.R * 255)
-	mtl.Specular[1] = byte(mt.SpecularColor.G * 255)
-	mtl.Specular[2] = byte(mt.SpecularColor.B * 255)
-
-	mtl.Shininess = float32(mt.Shininess)
-	mtl.Specularity = float32(mt.SpecularFactor)
-	mstMh.Materials = append(mstMh.Materials, mtl)
-	for _, tt := range mt.Textures {
-		if tt == nil {
-			continue
+func (cv *FbxToMst) convertMaterial(mstMh *mst.Mesh, mt *fbx.Material, repete bool) int32 {
+	mtl := &mst.PbrMaterial{Metallic: 0, Roughness: 1}
+	idx := int32(len(mstMh.Materials))
+	if mt.Textures[0] != nil {
+		// _, fileName := filepath.Split(string(tt.GetFileName()))
+		str := strings.ReplaceAll(mt.Textures[0].GetRelativeFileName().String(), "\\", "/")
+		var f string
+		if path.IsAbs(str) {
+			f = str
+		} else {
+			f = filepath.Join(cv.baseDir, str)
 		}
-		_, fileName := filepath.Split(string(tt.GetFileName()))
-		f := filepath.Join(cv.baseDir, fileName)
+
+		if midx, ok := cv.texMap[f]; ok {
+			return midx
+		}
+
 		tex, err := convertTex(f, cv.texId)
 		if err != nil {
-			return
+			return 0
 		}
 		tex.Repeated = repete
 		mtl.Texture = tex
 		cv.texId++
+		cv.texMap[f] = idx
 	}
+
+	if mt.Textures[1] != nil {
+		str := strings.ReplaceAll(mt.Textures[1].GetRelativeFileName().String(), "\\", "/")
+		var f string
+		if path.IsAbs(str) {
+			f = str
+		} else {
+			f = filepath.Join(cv.baseDir, str)
+		}
+
+		if midx, ok := cv.texMap[f]; ok {
+			return midx
+		}
+
+		tex, err := convertTex(f, cv.texId)
+		if err != nil {
+			return 0
+		}
+		tex.Repeated = repete
+		mtl.Normal = tex
+		cv.texId++
+		cv.texMap[f] = idx
+	}
+
+	mtl.Color[0] = byte(mt.DiffuseColor.R * 255)
+	mtl.Color[1] = byte(mt.DiffuseColor.G * 255)
+	mtl.Color[2] = byte(mt.DiffuseColor.B * 255)
+	mstMh.Materials = append(mstMh.Materials, mtl)
+	return idx
 }

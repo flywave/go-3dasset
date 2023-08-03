@@ -2,7 +2,10 @@ package asset3d
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/flywave/go-mst"
@@ -15,9 +18,13 @@ func TestGlb(t *testing.T) {
 
 func TestObj(t *testing.T) {
 	g := GltfToMst{}
-	mh, _, _ := g.Convert("test/2-103.glb")
-	f, _ := os.Create("test/2-103.mst")
-	mst.MeshMarshal(f, mh)
+	mh, _, _ := g.Convert("test/AOI-1.glb")
+	doc, _ := mst.MstToGltf([]*mst.Mesh{mh})
+	glftbts, _ := mst.GetGltfBinary(doc, 8)
+	ph2 := "test/AOI.glb"
+	f2, _ := os.Create(ph2)
+	f2.Write(glftbts)
+	f2.Close()
 }
 
 func TestObj2(t *testing.T) {
@@ -75,13 +82,37 @@ func TestGltf4(t *testing.T) {
 }
 
 func TestFBX(t *testing.T) {
-	ph := "/home/hj/snap/dukto/16/md/AOI.fbx"
+	ph := "/home/hj/snap/dukto/16/md/"
+	filepath.WalkDir(ph, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() || filepath.Ext(path) != ".fbx" {
+			return nil
+		}
+
+		ots := FbxToMst{}
+		mh, _, _ := ots.Convert(path)
+
+		doc, _ := mst.MstToGltf([]*mst.Mesh{mh})
+		glftbts, _ := mst.GetGltfBinary(doc, 8)
+		ph2 := strings.TrimSuffix(path, ".fbx") + ".glb"
+		f2, _ := os.Create(ph2)
+		f2.Write(glftbts)
+		f2.Close()
+		return nil
+	})
+
+}
+
+func TestFBX2(t *testing.T) {
+	ph := "/home/hj/snap/dukto/16/md/回流焊.fbx"
 	ots := FbxToMst{}
 	mh, _, _ := ots.Convert(ph)
 
 	doc, _ := mst.MstToGltf([]*mst.Mesh{mh})
 	glftbts, _ := mst.GetGltfBinary(doc, 8)
-	ph2 := "test/AOI.glb"
+	ph2 := "test/回流焊.glb"
 	f2, _ := os.Create(ph2)
 	f2.Write(glftbts)
 	f2.Close()
