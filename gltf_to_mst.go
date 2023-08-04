@@ -30,6 +30,8 @@ type GltfToMst struct {
 	mtlMap        map[uint32]map[uint32]bool
 	currentMeshId uint32
 	nodeMatrix    map[uint32]*dmat.T
+	parentMap     map[uint32]uint32
+	doc           *gltf.Document
 }
 
 func (g *GltfToMst) Convert(path string) (*mst.Mesh, *[6]float64, error) {
@@ -37,8 +39,24 @@ func (g *GltfToMst) Convert(path string) (*mst.Mesh, *[6]float64, error) {
 	if err != nil {
 		return nil, nil, err
 	}
+	g.doc = doc
 	g.nodeMatrix = make(map[uint32]*dmat.T)
+	g.parentMap = make(map[uint32]uint32)
+	g.getParent(doc, doc.Scenes[0].Nodes)
 	return g.ConvertFromDoc(doc)
+}
+
+func (g *GltfToMst) getParent(doc *gltf.Document, nds []uint32) {
+	for _, n := range nds {
+		nd := doc.Nodes[n]
+		if len(nd.Children) == 0 {
+			continue
+		}
+		for _, cn := range nd.Children {
+			g.parentMap[cn] = n
+		}
+		g.getParent(doc, nd.Children)
+	}
 }
 
 func (g *GltfToMst) ConvertFromDoc(doc *gltf.Document) (*mst.Mesh, *[6]float64, error) {
@@ -46,7 +64,7 @@ func (g *GltfToMst) ConvertFromDoc(doc *gltf.Document) (*mst.Mesh, *[6]float64, 
 	mesh := mst.NewMesh()
 	bbx := &[6]float64{}
 	isInstance := make(map[uint32]bool)
-	for _, nd := range doc.Nodes {
+	for i, nd := range doc.Nodes {
 		if nd.Mesh == nil {
 			continue
 		}
@@ -54,11 +72,11 @@ func (g *GltfToMst) ConvertFromDoc(doc *gltf.Document) (*mst.Mesh, *[6]float64, 
 			isInstance[*nd.Mesh] = true
 		} else {
 			isInstance[*nd.Mesh] = false
-			g.nodeMatrix[*nd.Mesh] = toMat(nd)
+			g.nodeMatrix[*nd.Mesh] = g.toMat(uint32(i), nd)
 		}
 	}
 	instMp := make(map[uint32]*mst.InstanceMesh)
-	for _, nd := range doc.Nodes {
+	for i, nd := range doc.Nodes {
 		if nd.Mesh == nil {
 			continue
 		}
@@ -80,7 +98,7 @@ func (g *GltfToMst) ConvertFromDoc(doc *gltf.Document) (*mst.Mesh, *[6]float64, 
 				instMp[g.currentMeshId] = inst
 
 			}
-			inst.Transfors = append(inst.Transfors, toMat(nd))
+			inst.Transfors = append(inst.Transfors, g.toMat(uint32(i), nd))
 		}
 	}
 	for _, v := range instMp {
@@ -205,9 +223,6 @@ func (g *GltfToMst) transMaterial(doc *gltf.Document, mstMh *mst.Mesh, id uint32
 	}
 	mt := doc.Materials[id]
 	mtl := &mst.PbrMaterial{}
-	mtl.Emissive[0] = byte(mt.EmissiveFactor[0] * 255)
-	mtl.Emissive[1] = byte(mt.EmissiveFactor[0] * 255)
-	mtl.Emissive[2] = byte(mt.EmissiveFactor[0] * 255)
 	if mt.PBRMetallicRoughness.BaseColorFactor != nil {
 		mtl.Color[0] = byte(mt.PBRMetallicRoughness.BaseColorFactor[0] * 255)
 		mtl.Color[1] = byte(mt.PBRMetallicRoughness.BaseColorFactor[1] * 255)
@@ -309,11 +324,18 @@ func (g *GltfToMst) decodeImage(mime string, rd io.Reader) (*mst.Texture, error)
 	return nil, errors.New("not support image type")
 }
 
-func toMat(nd *gltf.Node) *dmat.T {
+func (g *GltfToMst) toMat(idx uint32, nd *gltf.Node) *dmat.T {
+	mat := dmat.Ident
+	if pid, ok := g.parentMap[idx]; ok {
+		mat = *g.toMat(pid, g.doc.Nodes[pid])
+	}
 	sc := dvec3.T{float64(nd.Scale[0]), float64(nd.Scale[1]), float64(nd.Scale[2])}
 	tra := dvec3.T{float64(nd.Translation[0]), float64(nd.Translation[1]), float64(nd.Translation[2])}
 	rot := quaternion.T{float64(nd.Rotation[0]), float64(nd.Rotation[1]), float64(nd.Rotation[2]), float64(nd.Rotation[3])}
-	return dmat.Compose(&tra, &rot, &sc)
+	mt := dmat.Compose(&tra, &rot, &sc)
+	mat2 := dmat.Ident
+	mat2.AssignMul(&mat, mt)
+	return &mat2
 }
 
 func addPoint(bx *[6]float64, p *[3]float64) {

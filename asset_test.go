@@ -18,10 +18,10 @@ func TestGlb(t *testing.T) {
 
 func TestObj(t *testing.T) {
 	g := GltfToMst{}
-	mh, _, _ := g.Convert("test/aoi.glb")
+	mh, _, _ := g.Convert("test/untitled.glb")
 	doc, _ := mst.MstToGltf([]*mst.Mesh{mh})
 	glftbts, _ := mst.GetGltfBinary(doc, 8)
-	ph2 := "test/AOI.glb"
+	ph2 := "test/test1.glb"
 	f2, _ := os.Create(ph2)
 	f2.Write(glftbts)
 	f2.Close()
@@ -106,13 +106,13 @@ func TestFBX(t *testing.T) {
 }
 
 func TestFBX2(t *testing.T) {
-	ph := "/home/hj/snap/dukto/16/md/aoi.fbx"
+	ph := "/home/hj/snap/dukto/16/md/AOI.fbx"
 	ots := FbxToMst{}
 	mh, _, _ := ots.Convert(ph)
 
 	doc, _ := mst.MstToGltf([]*mst.Mesh{mh})
 	glftbts, _ := mst.GetGltfBinary(doc, 8)
-	ph2 := "test/回流焊.glb"
+	ph2 := "test/AOI1.glb"
 	f2, _ := os.Create(ph2)
 	f2.Write(glftbts)
 	f2.Close()
