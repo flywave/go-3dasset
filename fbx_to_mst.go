@@ -3,6 +3,7 @@ package asset3d
 import (
 	"os"
 	"path/filepath"
+	"strings"
 
 	mst "github.com/flywave/go-mst"
 	"github.com/flywave/go3d/float64/mat4"
@@ -89,11 +90,11 @@ func (cv *FbxToMst) convertMesh(mstMh *mst.Mesh, mh *fbx.Mesh) *dvec3.Box {
 		}
 	}
 
-	if g.Normals != nil {
-		for _, v := range g.Normals {
-			mhNode.Normals = append(mhNode.Normals, vec3.T{float32(v[0]), float32(v[1]), float32(v[2])})
-		}
-	}
+	// if g.Normals != nil {
+	// 	for _, v := range g.Normals {
+	// 		mhNode.Normals = append(mhNode.Normals, vec3.T{float32(v[0]), float32(v[1]), float32(v[2])})
+	// 	}
+	// }
 
 	fgMap := make(map[int32]*mst.MeshTriangle)
 	mtlMp := make(map[int]int32)
@@ -126,6 +127,7 @@ func (cv *FbxToMst) convertMesh(mstMh *mst.Mesh, mh *fbx.Mesh) *dvec3.Box {
 		gp.Faces = append(gp.Faces, &mst.Face{Vertex: [3]uint32{uint32(i * 3), uint32(i*3 + 1), uint32(i*3 + 2)}})
 	}
 
+	mhNode.ReComputeNormal()
 	mstMh.Nodes = append(mstMh.Nodes, mhNode)
 	return &bbx
 }
@@ -134,9 +136,17 @@ func (cv *FbxToMst) convertMaterial(mstMh *mst.Mesh, mt *fbx.Material, repete bo
 	mtl := &mst.PbrMaterial{Metallic: 0, Roughness: 1}
 	idx := int32(len(mstMh.Materials))
 	if mt.Textures[0] != nil {
-		_, fileName := filepath.Split(string(mt.Textures[0].GetFileName()))
 		// str := strings.ReplaceAll(mt.Textures[0].GetRelativeFileName().String(), "\\", "/")
-		f := filepath.Join(cv.baseDir, fileName)
+		// _, fileName := filepath.Split(str)
+		// f := filepath.Join(cv.baseDir, fileName)
+
+		var f string
+		str := strings.ReplaceAll(mt.Textures[0].GetRelativeFileName().String(), "\\", "/")
+		if filepath.IsAbs(str) {
+			f = str
+		} else {
+			f = filepath.Join(cv.baseDir, str)
+		}
 
 		if midx, ok := cv.texMap[f]; ok {
 			return midx
@@ -153,8 +163,18 @@ func (cv *FbxToMst) convertMaterial(mstMh *mst.Mesh, mt *fbx.Material, repete bo
 	}
 
 	if mt.Textures[1] != nil {
-		_, fileName := filepath.Split(string(mt.Textures[1].GetFileName()))
-		f := filepath.Join(cv.baseDir, fileName)
+		// str := strings.ReplaceAll(mt.Textures[1].GetRelativeFileName().String(), "\\", "/")
+		// _, fileName := filepath.Split(str)
+		// f := filepath.Join(cv.baseDir, fileName)
+
+		var f string
+		str := strings.ReplaceAll(mt.Textures[1].GetRelativeFileName().String(), "\\", "/")
+		if filepath.IsAbs(str) {
+			f = str
+		} else {
+			f = filepath.Join(cv.baseDir, str)
+		}
+
 		if midx, ok := cv.texMap[f]; ok {
 			return midx
 		}

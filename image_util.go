@@ -20,7 +20,7 @@ func convertTex(path string, texId int) (*mst.Texture, error) {
 	if err != nil {
 		return nil, err
 	}
-	_, ft, err := image.Decode(f)
+	_, ft, err := image.DecodeConfig(f)
 	if err != nil {
 		return nil, err
 	}
