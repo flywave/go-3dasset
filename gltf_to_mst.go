@@ -3,6 +3,7 @@ package asset3d
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/json"
 	"errors"
 	"image"
 	"image/color"
@@ -68,11 +69,18 @@ func (g *GltfToMst) ConvertFromDoc(doc *gltf.Document) (*mst.Mesh, *[6]float64, 
 		if nd.Mesh == nil {
 			continue
 		}
-		if _, ok := isInstance[*nd.Mesh]; ok {
+
+		_, ok1 := nd.Extensions["EXT_mesh_gpu_instancing"]
+		_, ok := isInstance[*nd.Mesh]
+		if ok || ok1 {
 			isInstance[*nd.Mesh] = true
 		} else {
 			isInstance[*nd.Mesh] = false
-			g.nodeMatrix[*nd.Mesh] = g.toMat(uint32(i), nd)
+			var err error
+			g.nodeMatrix[*nd.Mesh], err = g.toMat(uint32(i), nd)
+			if err != nil {
+				return nil, nil, err
+			}
 		}
 	}
 	instMp := make(map[uint32]*mst.InstanceMesh)
@@ -84,7 +92,10 @@ func (g *GltfToMst) ConvertFromDoc(doc *gltf.Document) (*mst.Mesh, *[6]float64, 
 		g.currentMeshId = *nd.Mesh
 		if v := isInstance[g.currentMeshId]; !v {
 			g.mtlMap[g.currentMeshId] = make(map[uint32]bool)
-			bx := g.transMesh(doc, mesh, g.currentMeshId)
+			bx, err := g.transMesh(doc, mesh, g.currentMeshId)
+			if err != nil {
+				return nil, nil, err
+			}
 			addPoint(bbx, &[3]float64{bx[0], bx[1], bx[2]})
 			addPoint(bbx, &[3]float64{bx[3], bx[4], bx[5]})
 		} else {
@@ -93,12 +104,19 @@ func (g *GltfToMst) ConvertFromDoc(doc *gltf.Document) (*mst.Mesh, *[6]float64, 
 			if inst, ok = instMp[g.currentMeshId]; !ok {
 				g.mtlMap[g.currentMeshId] = make(map[uint32]bool)
 				instMh := mst.NewMesh()
-				bx := g.transMesh(doc, instMh, g.currentMeshId)
+				bx, err := g.transMesh(doc, instMh, g.currentMeshId)
+				if err != nil {
+					return nil, nil, err
+				}
 				inst = &mst.InstanceMesh{BBox: bx, Mesh: &instMh.BaseMesh}
 				instMp[g.currentMeshId] = inst
 
 			}
-			inst.Transfors = append(inst.Transfors, g.toMat(uint32(i), nd))
+			trans, err := g.toMat(uint32(i), nd)
+			if err != nil {
+				return nil, nil, err
+			}
+			inst.Transfors = append(inst.Transfors, trans)
 		}
 	}
 	for _, v := range instMp {
@@ -107,68 +125,58 @@ func (g *GltfToMst) ConvertFromDoc(doc *gltf.Document) (*mst.Mesh, *[6]float64, 
 	return mesh, bbx, nil
 }
 
-func (g *GltfToMst) transMesh(doc *gltf.Document, mstMh *mst.Mesh, mhid uint32) *[6]float64 {
+func (g *GltfToMst) transMesh(doc *gltf.Document, mstMh *mst.Mesh, mhid uint32) (*[6]float64, error) {
 	mh := doc.Meshes[mhid]
 	accMap := make(map[uint32]bool)
 	mhNode := &mst.MeshNode{}
 	bbx := &[6]float64{}
-	var faceBuff *gltf.Buffer
-	var posBuff *gltf.Buffer
-	var posView *gltf.BufferView
-	var texBuff *gltf.Buffer
-	var texView *gltf.BufferView
-	var nlBuff *gltf.Buffer
-	var nlView *gltf.BufferView
+
 	for _, ps := range mh.Primitives {
 		if ps.Indices == nil {
 			continue
 		}
 		tg := &mst.MeshTriangle{}
 		acc := doc.Accessors[int(*ps.Indices)]
-		faceBuff = doc.Buffers[int(doc.BufferViews[int(*acc.BufferView)].Buffer)]
-		tg.Faces = make([]*mst.Face, int(acc.Count/3))
-		faceView := doc.BufferViews[int(*acc.BufferView)]
-		start := int(faceView.ByteOffset + acc.ByteOffset)
-		end := start + int(acc.Count*acc.ComponentType.ByteSize())
-		buff := faceBuff.Data[start:end]
-		bf := bytes.NewBuffer(buff)
-		if acc.ComponentType == gltf.ComponentUshort {
-			fcs := [3]uint16{}
-			for i := 0; i < len(tg.Faces); i++ {
-				f := &mst.Face{}
-				binary.Read(bf, binary.LittleEndian, &fcs)
-				f.Vertex[0] = uint32(fcs[0])
-				f.Vertex[1] = uint32(fcs[1])
-				f.Vertex[2] = uint32(fcs[2])
-				tg.Faces[i] = f
+		var fv []uint32
+		err := readDataByAccessor(doc, acc, func(res interface{}) {
+			switch fcs := res.(type) {
+			case *uint16:
+				{
+					fv = append(fv, uint32(*fcs))
+				}
+			case *uint32:
+				{
+					fv = append(fv, *fcs)
+				}
+			}
+		})
 
+		for i := 0; i < len(fv); i += 3 {
+			f := &mst.Face{
+				Vertex: [3]uint32{fv[i], fv[i+1], fv[i+2]},
 			}
-		} else if acc.ComponentType == gltf.ComponentUint {
-			fcs := [3]uint32{}
-			for i := 0; i < len(tg.Faces); i++ {
-				binary.Read(bf, binary.LittleEndian, &fcs)
-				f := &mst.Face{Vertex: fcs}
-				tg.Faces[i] = f
-			}
+			tg.Faces = append(tg.Faces, f)
+		}
+		if err != nil {
+			return nil, err
 		}
 
 		if idx, ok := ps.Attributes["POSITION"]; ok {
 			if _, ok := accMap[idx]; !ok {
 				mat, ok := g.nodeMatrix[mhid]
 				acc = doc.Accessors[idx]
-				posView = doc.BufferViews[int(*acc.BufferView)]
-				posBuff = doc.Buffers[int(posView.Buffer)]
-				bf := bytes.NewBuffer(posBuff.Data[int(posView.ByteOffset):int(posView.ByteOffset+posView.ByteLength)])
-				for i := 0; i < int(acc.Count); i++ {
-					v := vec3.T{}
-					binary.Read(bf, binary.LittleEndian, &v)
+				err := readDataByAccessor(doc, acc, func(res interface{}) {
+					v := (*vec3.T)(res.(*[3]float32))
 					if ok {
 						dv := dvec3.T{float64(v[0]), float64(v[1]), float64(v[2])}
 						dv = mat.MulVec3(&dv)
-						v = vec3.T{float32(dv[0]), float32(dv[1]), float32(dv[2])}
+						v = &vec3.T{float32(dv[0]), float32(dv[1]), float32(dv[2])}
 					}
-					mhNode.Vertices = append(mhNode.Vertices, v)
+					mhNode.Vertices = append(mhNode.Vertices, *v)
 					addPoint(bbx, &[3]float64{float64(v[0]), float64(v[1]), float64(v[2])})
+				})
+				if err != nil {
+					return nil, err
 				}
 				accMap[idx] = true
 			}
@@ -178,14 +186,13 @@ func (g *GltfToMst) transMesh(doc *gltf.Document, mstMh *mst.Mesh, mhid uint32) 
 		if idx, ok := ps.Attributes["TEXCOORD_0"]; ok {
 			if _, ok := accMap[idx]; !ok {
 				acc = doc.Accessors[idx]
-				texView = doc.BufferViews[int(*acc.BufferView)]
-				texBuff = doc.Buffers[int(texView.Buffer)]
-				bf := bytes.NewBuffer(texBuff.Data[int(texView.ByteOffset):int(texView.ByteOffset+texView.ByteLength)])
-				for i := 0; i < int(acc.Count); i++ {
-					v := vec2.T{}
-					binary.Read(bf, binary.LittleEndian, &v)
-					mhNode.TexCoords = append(mhNode.TexCoords, v)
+				err := readDataByAccessor(doc, acc, func(res interface{}) {
+					v := (*vec2.T)(res.(*[2]float32))
+					mhNode.TexCoords = append(mhNode.TexCoords, *v)
 					repete = repete || v[0] > 1.1 || v[1] > 1.1
+				})
+				if err != nil {
+					return nil, err
 				}
 				accMap[idx] = true
 			}
@@ -194,13 +201,12 @@ func (g *GltfToMst) transMesh(doc *gltf.Document, mstMh *mst.Mesh, mhid uint32) 
 		if idx, ok := ps.Attributes["NORMAL"]; ok {
 			if _, ok := accMap[idx]; !ok {
 				acc = doc.Accessors[idx]
-				nlView = doc.BufferViews[int(*acc.BufferView)]
-				nlBuff = doc.Buffers[int(nlView.Buffer)]
-				bf := bytes.NewBuffer(nlBuff.Data[int(nlView.ByteOffset):int(nlView.ByteOffset+nlView.ByteLength)])
-				for i := 0; i < int(acc.Count); i++ {
-					v := vec3.T{}
-					binary.Read(bf, binary.LittleEndian, &v)
-					mhNode.Normals = append(mhNode.Normals, v)
+				err := readDataByAccessor(doc, acc, func(res interface{}) {
+					v := (*vec3.T)(res.(*[3]float32))
+					mhNode.Normals = append(mhNode.Normals, *v)
+				})
+				if err != nil {
+					return nil, err
 				}
 				accMap[idx] = true
 			}
@@ -214,7 +220,59 @@ func (g *GltfToMst) transMesh(doc *gltf.Document, mstMh *mst.Mesh, mhid uint32) 
 		mstMh.Nodes = append(mstMh.Nodes, mhNode)
 	}
 
-	return bbx
+	return bbx, nil
+}
+
+func readDataByAccessor(doc *gltf.Document, acc *gltf.Accessor, procces func(interface{})) error {
+	bv := doc.BufferViews[*acc.BufferView]
+	buffer := doc.Buffers[bv.Buffer]
+	bf := bytes.NewBuffer(buffer.Data[int(bv.ByteOffset+acc.ByteOffset):int(bv.ByteOffset+bv.ByteLength)])
+
+	var fcs interface{}
+	if acc.Type == gltf.AccessorVec2 {
+		if acc.ComponentType == gltf.ComponentUshort {
+			fcs = &[2]uint16{}
+		} else if acc.ComponentType == gltf.ComponentUint {
+			fcs = &[2]uint32{}
+		} else if acc.ComponentType == gltf.ComponentFloat {
+			fcs = &[2]float32{}
+		}
+	} else if acc.Type == gltf.AccessorVec3 {
+		if acc.ComponentType == gltf.ComponentUshort {
+			fcs = &[3]uint16{}
+		} else if acc.ComponentType == gltf.ComponentUint {
+			fcs = &[3]uint32{}
+		} else if acc.ComponentType == gltf.ComponentFloat {
+			fcs = &[3]float32{}
+		}
+	} else if acc.Type == gltf.AccessorVec4 {
+		if acc.ComponentType == gltf.ComponentUshort {
+			fcs = &[4]uint16{}
+		} else if acc.ComponentType == gltf.ComponentUint {
+			fcs = &[4]uint32{}
+		} else if acc.ComponentType == gltf.ComponentFloat {
+			fcs = &[4]float32{}
+		}
+	} else if acc.Type == gltf.AccessorScalar {
+		if acc.ComponentType == gltf.ComponentUshort {
+			n := uint16(0)
+			fcs = &n
+		} else if acc.ComponentType == gltf.ComponentUint {
+			n := uint32(0)
+			fcs = &n
+		} else if acc.ComponentType == gltf.ComponentFloat {
+			n := float32(0)
+			fcs = &n
+		}
+	} else {
+		return errors.New("acc have no type")
+	}
+
+	for i := 0; i < int(acc.Count); i++ {
+		binary.Read(bf, binary.LittleEndian, fcs)
+		procces(fcs)
+	}
+	return nil
 }
 
 func (g *GltfToMst) transMaterial(doc *gltf.Document, mstMh *mst.Mesh, id uint32, repete bool) {
@@ -324,18 +382,71 @@ func (g *GltfToMst) decodeImage(mime string, rd io.Reader) (*mst.Texture, error)
 	return nil, errors.New("not support image type")
 }
 
-func (g *GltfToMst) toMat(idx uint32, nd *gltf.Node) *dmat.T {
+func (g *GltfToMst) toMat(idx uint32, nd *gltf.Node) (*dmat.T, error) {
 	mat := dmat.Ident
 	if pid, ok := g.parentMap[idx]; ok {
-		mat = *g.toMat(pid, g.doc.Nodes[pid])
+		mt, err := g.toMat(pid, g.doc.Nodes[pid])
+		if err != nil {
+			return nil, err
+		}
+		mat = *mt
 	}
-	sc := dvec3.T{float64(nd.Scale[0]), float64(nd.Scale[1]), float64(nd.Scale[2])}
-	tra := dvec3.T{float64(nd.Translation[0]), float64(nd.Translation[1]), float64(nd.Translation[2])}
-	rot := quaternion.T{float64(nd.Rotation[0]), float64(nd.Rotation[1]), float64(nd.Rotation[2]), float64(nd.Rotation[3])}
+
+	var trans *[3]float32
+	var scl *[3]float32
+	var rots *[4]float32
+
+	if v, ok := nd.Extensions["EXT_mesh_gpu_instancing"]; ok {
+		ins, ok := v.(map[string]interface{})
+		if !ok {
+			dt, _ := json.Marshal(v)
+			ins = map[string]interface{}{}
+			json.Unmarshal(dt, &ins)
+		}
+		if vv, ok := ins["attributes"]; ok {
+			atr, ok := vv.(map[string]interface{})
+			if !ok {
+				dt, _ := json.Marshal(v)
+				atr = map[string]interface{}{}
+				json.Unmarshal(dt, &atr)
+			}
+			tranAcc := int(atr["TRANSLATION"].(float64))
+			err := readDataByAccessor(g.doc, g.doc.Accessors[tranAcc], func(res interface{}) {
+				trans = res.(*[3]float32)
+			})
+			if err != nil {
+				return nil, err
+			}
+
+			sclAcc := int(atr["SCALE"].(float64))
+			err = readDataByAccessor(g.doc, g.doc.Accessors[sclAcc], func(res interface{}) {
+				scl = res.(*[3]float32)
+			})
+			if err != nil {
+				return nil, err
+			}
+			rotAcc := int(atr["ROTATION"].(float64))
+			err = readDataByAccessor(g.doc, g.doc.Accessors[rotAcc], func(res interface{}) {
+				rots = res.(*[4]float32)
+			})
+			if err != nil {
+				return nil, err
+			}
+
+		}
+	} else {
+		scl = &nd.Scale
+		trans = &nd.Translation
+		rots = &nd.Rotation
+	}
+
+	sc := dvec3.T{float64(scl[0]), float64(scl[1]), float64(scl[2])}
+	tra := dvec3.T{float64(trans[0]), float64(trans[1]), float64(trans[2])}
+	rot := quaternion.T{float64(rots[0]), float64(rots[1]), float64(rots[2]), float64(rots[3])}
 	mt := dmat.Compose(&tra, &rot, &sc)
 	mat2 := dmat.Ident
 	mat2.AssignMul(&mat, mt)
-	return &mat2
+	return &mat2, nil
 }
 
 func addPoint(bx *[6]float64, p *[3]float64) {

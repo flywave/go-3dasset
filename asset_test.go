@@ -18,8 +18,18 @@ func TestGlb(t *testing.T) {
 
 func TestObj(t *testing.T) {
 	g := GltfToMst{}
-	mh, _, _ := g.Convert("test/untitled.glb")
-	doc, _ := mst.MstToGltf([]*mst.Mesh{mh})
+	mh, _, err := g.Convert("test/out_79_88_tower_0.glb")
+	if err != nil {
+		t.Error(err)
+	}
+	f, _ := os.Create("test/test1.mst")
+	mst.MeshMarshal(f, mh)
+	// mh.InstanceNode = nil
+	f.Close()
+	doc, err := mst.MstToGltf([]*mst.Mesh{mh})
+	if err != nil {
+		t.Error(err)
+	}
 	glftbts, _ := mst.GetGltfBinary(doc, 8)
 	ph2 := "test/test1.glb"
 	f2, _ := os.Create(ph2)

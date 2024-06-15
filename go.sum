@@ -52,6 +52,8 @@ github.com/flywave/go-mapbox v0.0.0-20211214141607-a6ac10dbb5a6/go.mod h1:pQYpFq
 github.com/flywave/go-mst v0.0.0-20221203010757-2cc683633186/go.mod h1:4Z8vx9dxgIXdNCd7JEaIhcwMD86dhPknQ/AbUJ8Rx1E=
 github.com/flywave/go-mst v0.0.0-20240203004106-5b10fa10c5f4 h1:kfjmkkyojb7AmgeAe0KsG532mxvRe44vM/g4Mt2s/9Q=
 github.com/flywave/go-mst v0.0.0-20240203004106-5b10fa10c5f4/go.mod h1:4Z8vx9dxgIXdNCd7JEaIhcwMD86dhPknQ/AbUJ8Rx1E=
+github.com/flywave/go-mst v0.0.0-20240614092742-1ce52f482b1b h1:belJVAjZBpXew1kqw/QXbehnvkFDwUa+CeHf1LOOgSo=
+github.com/flywave/go-mst v0.0.0-20240614092742-1ce52f482b1b/go.mod h1:4Z8vx9dxgIXdNCd7JEaIhcwMD86dhPknQ/AbUJ8Rx1E=
 github.com/flywave/go-obj v0.0.0-20220925000332-cb9876e3c58b h1:3rdo0wo8a4Bz/5+Jf9MEKxh89W+49QBzzUGbeDW9IHE=
 github.com/flywave/go-obj v0.0.0-20220925000332-cb9876e3c58b/go.mod h1:/R2a8b3rp9GpHrSSgB5vaYgDHJaV3Vlk4izFyBwAYos=
 github.com/flywave/go-pbf v0.0.0-20210701015929-a3bdb1f6728e/go.mod h1:cfHFEG24/0hT2xCSLJb8rT/2WE8ieeIrbOJq1sql/fg=
