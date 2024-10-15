@@ -18,7 +18,7 @@ func TestGlb(t *testing.T) {
 
 func TestObj(t *testing.T) {
 	g := GltfToMst{}
-	mh, _, err := g.Convert("test/out_79_88_tower_0.glb")
+	mh, _, err := g.Convert("test/隧道.glb")
 	if err != nil {
 		t.Error(err)
 	}
@@ -31,7 +31,7 @@ func TestObj(t *testing.T) {
 		t.Error(err)
 	}
 	glftbts, _ := mst.GetGltfBinary(doc, 8)
-	ph2 := "test/test1.glb"
+	ph2 := "test/隧道1.glb"
 	f2, _ := os.Create(ph2)
 	f2.Write(glftbts)
 	f2.Close()

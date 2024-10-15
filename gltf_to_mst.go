@@ -43,21 +43,7 @@ func (g *GltfToMst) Convert(path string) (*mst.Mesh, *[6]float64, error) {
 	g.doc = doc
 	g.nodeMatrix = make(map[uint32]*dmat.T)
 	g.parentMap = make(map[uint32]uint32)
-	g.getParent(doc, doc.Scenes[0].Nodes)
 	return g.ConvertFromDoc(doc)
-}
-
-func (g *GltfToMst) getParent(doc *gltf.Document, nds []uint32) {
-	for _, n := range nds {
-		nd := doc.Nodes[n]
-		if len(nd.Children) == 0 {
-			continue
-		}
-		for _, cn := range nd.Children {
-			g.parentMap[cn] = n
-		}
-		g.getParent(doc, nd.Children)
-	}
 }
 
 func (g *GltfToMst) ConvertFromDoc(doc *gltf.Document) (*mst.Mesh, *[6]float64, error) {
@@ -65,58 +51,23 @@ func (g *GltfToMst) ConvertFromDoc(doc *gltf.Document) (*mst.Mesh, *[6]float64, 
 	mesh := mst.NewMesh()
 	bbx := &[6]float64{}
 	isInstance := make(map[uint32]bool)
-	for i, nd := range doc.Nodes {
-		if nd.Mesh == nil {
-			continue
-		}
-
-		_, ok1 := nd.Extensions["EXT_mesh_gpu_instancing"]
-		_, ok := isInstance[*nd.Mesh]
-		if ok || ok1 {
-			isInstance[*nd.Mesh] = true
-		} else {
-			isInstance[*nd.Mesh] = false
-			var err error
-			g.nodeMatrix[*nd.Mesh], err = g.toMat(uint32(i), nd)
-			if err != nil {
-				return nil, nil, err
-			}
+	for _, i := range doc.Scenes[0].Nodes {
+		err := g.processNode(i, doc, isInstance)
+		if err != nil {
+			return nil, nil, err
 		}
 	}
+
 	instMp := make(map[uint32]*mst.InstanceMesh)
-	for i, nd := range doc.Nodes {
-		if nd.Mesh == nil {
-			continue
-		}
-
-		g.currentMeshId = *nd.Mesh
-		if v := isInstance[g.currentMeshId]; !v {
-			g.mtlMap[g.currentMeshId] = make(map[uint32]bool)
-			bx, err := g.transMesh(doc, mesh, g.currentMeshId)
+	for _, idx := range doc.Scenes[0].Nodes {
+		nd := doc.Nodes[idx]
+		if nd.Mesh != nil {
+			v := isInstance[g.currentMeshId]
+			g.currentMeshId = *nd.Mesh
+			err := g.processMesh(doc, instMp, mesh, bbx, int(idx), v)
 			if err != nil {
 				return nil, nil, err
 			}
-			addPoint(bbx, &[3]float64{bx[0], bx[1], bx[2]})
-			addPoint(bbx, &[3]float64{bx[3], bx[4], bx[5]})
-		} else {
-			var inst *mst.InstanceMesh
-			var ok bool
-			if inst, ok = instMp[g.currentMeshId]; !ok {
-				g.mtlMap[g.currentMeshId] = make(map[uint32]bool)
-				instMh := mst.NewMesh()
-				bx, err := g.transMesh(doc, instMh, g.currentMeshId)
-				if err != nil {
-					return nil, nil, err
-				}
-				inst = &mst.InstanceMesh{BBox: bx, Mesh: &instMh.BaseMesh}
-				instMp[g.currentMeshId] = inst
-
-			}
-			trans, err := g.toMat(uint32(i), nd)
-			if err != nil {
-				return nil, nil, err
-			}
-			inst.Transfors = append(inst.Transfors, trans)
 		}
 	}
 	for _, v := range instMp {
@@ -125,7 +76,73 @@ func (g *GltfToMst) ConvertFromDoc(doc *gltf.Document) (*mst.Mesh, *[6]float64, 
 	return mesh, bbx, nil
 }
 
-func (g *GltfToMst) transMesh(doc *gltf.Document, mstMh *mst.Mesh, mhid uint32) (*[6]float64, error) {
+func (g *GltfToMst) processNode(i uint32, doc *gltf.Document, isInstance map[uint32]bool) error {
+	nd := doc.Nodes[i]
+	_, ok := g.nodeMatrix[uint32(i)]
+	if ok {
+		return nil
+	}
+	if nd.Mesh != nil {
+		_, ok1 := nd.Extensions["EXT_mesh_gpu_instancing"]
+		// _, ok := isInstance[*nd.Mesh]
+		if ok1 {
+			isInstance[*nd.Mesh] = true
+		} else {
+			isInstance[*nd.Mesh] = false
+		}
+		var err error
+		g.nodeMatrix[uint32(i)], err = g.toMat(nd)
+		if err != nil {
+			return err
+		}
+	} else if len(nd.Children) > 0 {
+		var err error
+		g.nodeMatrix[uint32(i)], err = g.toMat(nd)
+		if err != nil {
+			return err
+		}
+		for _, m := range nd.Children {
+			g.parentMap[m] = uint32(i)
+			g.processNode(m, doc, isInstance)
+		}
+	}
+	return nil
+}
+
+func (g *GltfToMst) processMesh(doc *gltf.Document, instMp map[uint32]*mst.InstanceMesh, mesh *mst.Mesh, bbx *[6]float64, i int, isInstance bool) error {
+	if !isInstance {
+		g.mtlMap[g.currentMeshId] = make(map[uint32]bool)
+		bx, err := g.transMesh(doc, mesh, g.currentMeshId, uint32(i))
+		if err != nil {
+			return err
+		}
+		addPoint(bbx, &[3]float64{bx[0], bx[1], bx[2]})
+		addPoint(bbx, &[3]float64{bx[3], bx[4], bx[5]})
+	} else {
+		var inst *mst.InstanceMesh
+		var ok bool
+		if inst, ok = instMp[g.currentMeshId]; !ok {
+			g.mtlMap[g.currentMeshId] = make(map[uint32]bool)
+			instMh := mst.NewMesh()
+			bx, err := g.transMesh(doc, instMh, g.currentMeshId, math.MaxUint32)
+			if err != nil {
+				return err
+			}
+			inst = &mst.InstanceMesh{BBox: bx, Mesh: &instMh.BaseMesh}
+			instMp[g.currentMeshId] = inst
+
+		}
+		trans := g.getMatrix(uint32(i))
+		inst.Transfors = append(inst.Transfors, trans)
+	}
+
+	for _, v := range instMp {
+		mesh.InstanceNode = append(mesh.InstanceNode, v)
+	}
+	return nil
+}
+
+func (g *GltfToMst) transMesh(doc *gltf.Document, mstMh *mst.Mesh, mhid uint32, ndIndex uint32) (*[6]float64, error) {
 	mh := doc.Meshes[mhid]
 	accMap := make(map[uint32]bool)
 	mhNode := &mst.MeshNode{}
@@ -150,6 +167,9 @@ func (g *GltfToMst) transMesh(doc *gltf.Document, mstMh *mst.Mesh, mhid uint32) 
 				}
 			}
 		})
+		if err != nil {
+			return nil, err
+		}
 
 		for i := 0; i < len(fv); i += 3 {
 			f := &mst.Face{
@@ -157,17 +177,14 @@ func (g *GltfToMst) transMesh(doc *gltf.Document, mstMh *mst.Mesh, mhid uint32) 
 			}
 			tg.Faces = append(tg.Faces, f)
 		}
-		if err != nil {
-			return nil, err
-		}
 
 		if idx, ok := ps.Attributes["POSITION"]; ok {
 			if _, ok := accMap[idx]; !ok {
-				mat, ok := g.nodeMatrix[mhid]
 				acc = doc.Accessors[idx]
+				mat := g.getMatrix(ndIndex)
 				err := readDataByAccessor(doc, acc, func(res interface{}) {
 					v := (*vec3.T)(res.(*[3]float32))
-					if ok {
+					if mat != nil {
 						dv := dvec3.T{float64(v[0]), float64(v[1]), float64(v[2])}
 						dv = mat.MulVec3(&dv)
 						v = &vec3.T{float32(dv[0]), float32(dv[1]), float32(dv[2])}
@@ -213,7 +230,7 @@ func (g *GltfToMst) transMesh(doc *gltf.Document, mstMh *mst.Mesh, mhid uint32) 
 		}
 		mhNode.FaceGroup = append(mhNode.FaceGroup, tg)
 		tg.Batchid = int32(len(mstMh.Materials))
-		g.transMaterial(doc, mstMh, *ps.Material, repete)
+		g.transMaterial(doc, mstMh, ps.Material, repete)
 	}
 
 	if len(mhNode.FaceGroup) > 0 {
@@ -221,6 +238,22 @@ func (g *GltfToMst) transMesh(doc *gltf.Document, mstMh *mst.Mesh, mhid uint32) 
 	}
 
 	return bbx, nil
+}
+
+func (g *GltfToMst) getMatrix(idx uint32) *dmat.T {
+	i, ok := g.parentMap[idx]
+	mat := dmat.Ident
+	if ok {
+		mat = *g.getMatrix(i)
+	}
+
+	mat2 := dmat.Ident
+	mt := g.nodeMatrix[idx]
+	if mt == nil {
+		return &mat2
+	}
+	mat2.AssignMul(mt, &mat)
+	return &mat2
 }
 
 func readDataByAccessor(doc *gltf.Document, acc *gltf.Accessor, procces func(interface{})) error {
@@ -275,78 +308,85 @@ func readDataByAccessor(doc *gltf.Document, acc *gltf.Accessor, procces func(int
 	return nil
 }
 
-func (g *GltfToMst) transMaterial(doc *gltf.Document, mstMh *mst.Mesh, id uint32, repete bool) {
-	if v, ok := g.mtlMap[g.currentMeshId][id]; ok && v {
-		return
-	}
-	mt := doc.Materials[id]
+func (g *GltfToMst) transMaterial(doc *gltf.Document, mstMh *mst.Mesh, idPtr *uint32, repete bool) {
 	mtl := &mst.PbrMaterial{}
-	if mt.PBRMetallicRoughness.BaseColorFactor != nil {
-		mtl.Color[0] = byte(mt.PBRMetallicRoughness.BaseColorFactor[0] * 255)
-		mtl.Color[1] = byte(mt.PBRMetallicRoughness.BaseColorFactor[1] * 255)
-		mtl.Color[2] = byte(mt.PBRMetallicRoughness.BaseColorFactor[2] * 255)
-		mtl.Transparency = 1 - float32(mt.PBRMetallicRoughness.BaseColorFactor[3])
-	}
-	if mt.PBRMetallicRoughness.MetallicFactor != nil {
-		mtl.Metallic = float32(*mt.PBRMetallicRoughness.MetallicFactor)
-	}
-	if mt.PBRMetallicRoughness.RoughnessFactor != nil {
-		mtl.Roughness = float32(*mt.PBRMetallicRoughness.RoughnessFactor)
-	}
-	if mt.PBRMetallicRoughness.BaseColorTexture != nil {
-		texInfo := mt.PBRMetallicRoughness.BaseColorTexture
-		texIdx := texInfo.Index
-		src := *doc.Textures[int(texIdx)].Source
-		img := doc.Images[int(src)]
-		var tex *mst.Texture
-		var buf io.Reader
-		var err error
-		if img.BufferView != nil {
-			view := doc.BufferViews[int(*img.BufferView)]
-			bufferIdx := view.Buffer
-			buffer := doc.Buffers[int(bufferIdx)]
-			bt := buffer.Data[view.ByteOffset : view.ByteOffset+view.ByteLength]
-			buf = bytes.NewBuffer(bt)
-		}
-		tex, err = g.decodeImage(img.MimeType, buf)
-		if err != nil {
+	mtl.Color[0] = 255
+	mtl.Color[1] = 255
+	mtl.Color[2] = 255
+	mtl.Transparency = 0
+	if idPtr != nil {
+		id := *idPtr
+		if v, ok := g.mtlMap[g.currentMeshId][id]; ok && v {
 			return
 		}
-		if tex != nil {
-			tex.Id = int32(texIdx)
-			tex.Repeated = repete
-			mtl.TextureMaterial.Texture = tex
+		mt := doc.Materials[id]
+		if mt.PBRMetallicRoughness.BaseColorFactor != nil {
+			mtl.Color[0] = byte(mt.PBRMetallicRoughness.BaseColorFactor[0] * 255)
+			mtl.Color[1] = byte(mt.PBRMetallicRoughness.BaseColorFactor[1] * 255)
+			mtl.Color[2] = byte(mt.PBRMetallicRoughness.BaseColorFactor[2] * 255)
+			mtl.Transparency = 1 - float32(mt.PBRMetallicRoughness.BaseColorFactor[3])
 		}
-	}
+		if mt.PBRMetallicRoughness.MetallicFactor != nil {
+			mtl.Metallic = float32(*mt.PBRMetallicRoughness.MetallicFactor)
+		}
+		if mt.PBRMetallicRoughness.RoughnessFactor != nil {
+			mtl.Roughness = float32(*mt.PBRMetallicRoughness.RoughnessFactor)
+		}
+		if mt.PBRMetallicRoughness.BaseColorTexture != nil {
+			texInfo := mt.PBRMetallicRoughness.BaseColorTexture
+			texIdx := texInfo.Index
+			src := *doc.Textures[int(texIdx)].Source
+			img := doc.Images[int(src)]
+			var tex *mst.Texture
+			var buf io.Reader
+			var err error
+			if img.BufferView != nil {
+				view := doc.BufferViews[int(*img.BufferView)]
+				bufferIdx := view.Buffer
+				buffer := doc.Buffers[int(bufferIdx)]
+				bt := buffer.Data[view.ByteOffset : view.ByteOffset+view.ByteLength]
+				buf = bytes.NewBuffer(bt)
+			}
+			tex, err = g.decodeImage(img.MimeType, buf)
+			if err != nil {
+				return
+			}
+			if tex != nil {
+				tex.Id = int32(texIdx)
+				tex.Repeated = repete
+				mtl.TextureMaterial.Texture = tex
+			}
+		}
 
-	if mt.NormalTexture != nil {
-		norlTexInfo := mt.NormalTexture
-		texIdx := norlTexInfo.Index
-		src := *doc.Textures[int(*texIdx)].Source
-		img := doc.Images[int(src)]
-		var tex *mst.Texture
-		var buf io.Reader
-		var err error
-		if img.BufferView != nil {
-			view := doc.BufferViews[int(*img.BufferView)]
-			bufferIdx := view.Buffer
-			buffer := doc.Buffers[int(bufferIdx)]
-			bt := buffer.Data[view.ByteOffset : view.ByteOffset+view.ByteLength]
-			buf = bytes.NewBuffer(bt)
+		if mt.NormalTexture != nil {
+			norlTexInfo := mt.NormalTexture
+			texIdx := norlTexInfo.Index
+			src := *doc.Textures[int(*texIdx)].Source
+			img := doc.Images[int(src)]
+			var tex *mst.Texture
+			var buf io.Reader
+			var err error
+			if img.BufferView != nil {
+				view := doc.BufferViews[int(*img.BufferView)]
+				bufferIdx := view.Buffer
+				buffer := doc.Buffers[int(bufferIdx)]
+				bt := buffer.Data[view.ByteOffset : view.ByteOffset+view.ByteLength]
+				buf = bytes.NewBuffer(bt)
+			}
+			tex, err = g.decodeImage(img.MimeType, buf)
+			if err != nil {
+				return
+			}
+			if tex != nil {
+				tex.Id = int32(*texIdx)
+				tex.Repeated = repete
+				mtl.TextureMaterial.Normal = tex
+			}
 		}
-		tex, err = g.decodeImage(img.MimeType, buf)
-		if err != nil {
-			return
-		}
-		if tex != nil {
-			tex.Id = int32(*texIdx)
-			tex.Repeated = repete
-			mtl.TextureMaterial.Normal = tex
-		}
-	}
 
+		g.mtlMap[g.currentMeshId][id] = true
+	}
 	mstMh.Materials = append(mstMh.Materials, mtl)
-	g.mtlMap[g.currentMeshId][id] = true
 }
 
 func (g *GltfToMst) decodeImage(mime string, rd io.Reader) (*mst.Texture, error) {
@@ -382,16 +422,7 @@ func (g *GltfToMst) decodeImage(mime string, rd io.Reader) (*mst.Texture, error)
 	return nil, errors.New("not support image type")
 }
 
-func (g *GltfToMst) toMat(idx uint32, nd *gltf.Node) (*dmat.T, error) {
-	mat := dmat.Ident
-	if pid, ok := g.parentMap[idx]; ok {
-		mt, err := g.toMat(pid, g.doc.Nodes[pid])
-		if err != nil {
-			return nil, err
-		}
-		mat = *mt
-	}
-
+func (g *GltfToMst) toMat(nd *gltf.Node) (*dmat.T, error) {
 	var trans *[3]float32
 	var scl *[3]float32
 	var rots *[4]float32
@@ -436,6 +467,9 @@ func (g *GltfToMst) toMat(idx uint32, nd *gltf.Node) (*dmat.T, error) {
 		}
 	} else {
 		scl = &nd.Scale
+		if scl[0] == 0 && scl[1] == 0 && scl[2] == 0 {
+			scl = &[3]float32{1, 1, 1}
+		}
 		trans = &nd.Translation
 		rots = &nd.Rotation
 	}
@@ -444,9 +478,7 @@ func (g *GltfToMst) toMat(idx uint32, nd *gltf.Node) (*dmat.T, error) {
 	tra := dvec3.T{float64(trans[0]), float64(trans[1]), float64(trans[2])}
 	rot := quaternion.T{float64(rots[0]), float64(rots[1]), float64(rots[2]), float64(rots[3])}
 	mt := dmat.Compose(&tra, &rot, &sc)
-	mat2 := dmat.Ident
-	mat2.AssignMul(&mat, mt)
-	return &mat2, nil
+	return mt, nil
 }
 
 func addPoint(bx *[6]float64, p *[3]float64) {
