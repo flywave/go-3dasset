@@ -71,6 +71,8 @@ github.com/flywave/go3d v0.0.0-20240109050628-b891a10fca74/go.mod h1:bvblxPT+cF0
 github.com/flywave/imaging v1.6.5/go.mod h1:bRCKaWaLAnzHVHN7PTZw71MxmNZlZ7T9l1Kvlg7+ytY=
 github.com/flywave/ofbx v0.1.1-0.20210621005150-08292dcb7ef2 h1:IpZCcytDXEu5DYnjhV1io034WpxNrCiNMy6730DG4R0=
 github.com/flywave/ofbx v0.1.1-0.20210621005150-08292dcb7ef2/go.mod h1:4IKqGEjtQy59XKgqAghkb1bt7P9MnFLRva3iIvUYLW4=
+github.com/flywave/ofbx v1.0.1 h1:NLBjO174747Bxn9Qq41dIdsVPMb4okW0KIjERrz1KyU=
+github.com/flywave/ofbx v1.0.1/go.mod h1:4IKqGEjtQy59XKgqAghkb1bt7P9MnFLRva3iIvUYLW4=
 github.com/fsnotify/fsnotify v1.4.7/go.mod h1:jwhsz4b93w/PPRr/qN1Yymfu8t87LnFCMoQvtojpjFo=
 github.com/go-courier/ptr v1.0.1/go.mod h1:oBnPUcGul7WHILdX53pcWGzGUUJ4GoZ/YaDTnS2Fi/M=
 github.com/go-courier/reflectx v1.3.4/go.mod h1:UP/ivAcgLD61WD44dpJlEudkcYN37Tlc5eL1e2E96SQ=
