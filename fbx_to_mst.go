@@ -134,14 +134,6 @@ func (cv *FbxToMst) convertMaterial(mstMh *mst.Mesh, mt *fbx.Material, repete bo
 		_, fileName := filepath.Split(str)
 		f := filepath.Join(cv.baseDir, fileName)
 
-		// var f string
-		// str := strings.ReplaceAll(mt.Textures[0].GetRelativeFileName().String(), "\\", "/")
-		// if filepath.IsAbs(str) {
-		// 	f = str
-		// } else {
-		// 	f = filepath.Join(cv.baseDir, str)
-		// }
-
 		if midx, ok := cv.texMap[f]; ok {
 			return midx
 		}
@@ -160,14 +152,6 @@ func (cv *FbxToMst) convertMaterial(mstMh *mst.Mesh, mt *fbx.Material, repete bo
 		str := strings.ReplaceAll(mt.Textures[1].GetRelativeFileName().String(), "\\", "/")
 		_, fileName := filepath.Split(str)
 		f := filepath.Join(cv.baseDir, fileName)
-
-		// var f string
-		// str := strings.ReplaceAll(mt.Textures[1].GetRelativeFileName().String(), "\\", "/")
-		// if filepath.IsAbs(str) {
-		// 	f = str
-		// } else {
-		// 	f = filepath.Join(cv.baseDir, str)
-		// }
 
 		if midx, ok := cv.texMap[f]; ok {
 			return midx
