@@ -20,7 +20,7 @@ import (
 	"github.com/flywave/go3d/vec2"
 	"github.com/flywave/go3d/vec3"
 
-	"github.com/qmuntal/gltf"
+	"github.com/flywave/gltf"
 )
 
 var (
