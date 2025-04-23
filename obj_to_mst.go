@@ -28,11 +28,14 @@ func (obj *ObjToMst) Convert(path string) (*mst.Mesh, *[6]float64, error) {
 	var err error
 	mtlGroup := make(map[uint32]int)
 	gmap := make(map[uint32]int)
+	gcount := len(loader.Materials)
+	if gcount == 0 {
+		gcount = 1
+	}
 
-	meshNode.FaceGroup = make([]*mst.MeshTriangle, len(loader.Materials))
+	meshNode.FaceGroup = make([]*mst.MeshTriangle, gcount)
 
 	if loader.Triangles != nil {
-
 		for i := 0; i < len(loader.Triangles); i++ {
 			t := &loader.Triangles[i]
 			mtlId := t.Mtl

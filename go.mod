@@ -3,6 +3,8 @@ module github.com/flywave/go-3dasset
 go 1.23.7
 
 replace github.com/flywave/flywave-mesh => ../flywave-mesh
+replace github.com/flywave/go-topo => ../go-topo
+
 
 require (
 	github.com/chai2010/tiff v0.0.0-20211005095045-4ec2aa243943
@@ -11,7 +13,7 @@ require (
 	github.com/flywave/go-3ds v0.0.0-20210617133319-24beedbcf9db
 	github.com/flywave/go-3jsbin v0.0.0-20240203004220-1e101f10fa3e
 	github.com/flywave/go-collada v0.0.0-20210617100142-f02e95c083a9
-	github.com/flywave/go-mst v0.0.0-20250411081337-1b2dbe82fdc4
+	github.com/flywave/go-mst v0.0.0-20250411081538-2c0bc0ea6e8b
 	github.com/flywave/go3d v0.0.0-20250314015505-bf0fda02e242
 	github.com/flywave/ofbx v1.0.1
 	golang.org/x/image v0.26.0
