@@ -92,7 +92,7 @@ func TestGltf4(t *testing.T) {
 }
 
 func TestFBX(t *testing.T) {
-	ph := "/home/hj/snap/dukto/16/md/"
+	ph := "test/"
 	filepath.WalkDir(ph, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err

@@ -100,9 +100,13 @@ func (cv *FbxToMst) convertMesh(mstMh *mst.Mesh, mh *fbx.Mesh) *dvec3.Box {
 		batchId := batchs[i]
 		bid, ok := mtlMp[batchId]
 		var gp *mst.MeshTriangle
+		var mt *fbx.Material
 
+		if len(mh.Materials) > batchId {
+			mt = mh.Materials[batchId]
+		}
 		if !ok {
-			bid = cv.convertMaterial(mstMh, mh.Materials[batchId], repete)
+			bid = cv.convertMaterial(mstMh, mt, repete)
 			mtlMp[batchId] = bid
 			gp = &mst.MeshTriangle{Batchid: bid}
 			fgMap[bid] = gp
@@ -127,49 +131,53 @@ func (cv *FbxToMst) convertMesh(mstMh *mst.Mesh, mh *fbx.Mesh) *dvec3.Box {
 }
 
 func (cv *FbxToMst) convertMaterial(mstMh *mst.Mesh, mt *fbx.Material, repete bool) int32 {
-	mtl := &mst.PbrMaterial{Metallic: 0, Roughness: 1}
 	idx := int32(len(mstMh.Materials))
-	if mt.Textures[0] != nil {
-		str := strings.ReplaceAll(mt.Textures[0].GetRelativeFileName().String(), "\\", "/")
-		_, fileName := filepath.Split(str)
-		f := filepath.Join(cv.baseDir, fileName)
+	mtl := &mst.PbrMaterial{Metallic: 0, Roughness: 1}
+	if mt != nil {
+		if mt.Textures[0] != nil {
+			str := strings.ReplaceAll(mt.Textures[0].GetRelativeFileName().String(), "\\", "/")
+			_, fileName := filepath.Split(str)
+			f := filepath.Join(cv.baseDir, fileName)
 
-		if midx, ok := cv.texMap[f]; ok {
-			return midx
+			if midx, ok := cv.texMap[f]; ok {
+				return midx
+			}
+
+			tex, err := convertTex(f, cv.texId)
+			if err != nil {
+				return 0
+			}
+			tex.Repeated = repete
+			mtl.Texture = tex
+			cv.texId++
+			cv.texMap[f] = idx
 		}
 
-		tex, err := convertTex(f, cv.texId)
-		if err != nil {
-			return 0
+		if mt.Textures[1] != nil {
+			str := strings.ReplaceAll(mt.Textures[1].GetRelativeFileName().String(), "\\", "/")
+			_, fileName := filepath.Split(str)
+			f := filepath.Join(cv.baseDir, fileName)
+
+			if midx, ok := cv.texMap[f]; ok {
+				return midx
+			}
+
+			tex, err := convertTex(f, cv.texId)
+			if err != nil {
+				return 0
+			}
+			tex.Repeated = repete
+			mtl.Normal = tex
+			cv.texId++
+			cv.texMap[f] = idx
 		}
-		tex.Repeated = repete
-		mtl.Texture = tex
-		cv.texId++
-		cv.texMap[f] = idx
+
+		mtl.Color[0] = byte(mt.DiffuseColor.R * 255)
+		mtl.Color[1] = byte(mt.DiffuseColor.G * 255)
+		mtl.Color[2] = byte(mt.DiffuseColor.B * 255)
+	} else {
+		mtl.Color = [3]byte{255, 255, 255}
 	}
-
-	if mt.Textures[1] != nil {
-		str := strings.ReplaceAll(mt.Textures[1].GetRelativeFileName().String(), "\\", "/")
-		_, fileName := filepath.Split(str)
-		f := filepath.Join(cv.baseDir, fileName)
-
-		if midx, ok := cv.texMap[f]; ok {
-			return midx
-		}
-
-		tex, err := convertTex(f, cv.texId)
-		if err != nil {
-			return 0
-		}
-		tex.Repeated = repete
-		mtl.Normal = tex
-		cv.texId++
-		cv.texMap[f] = idx
-	}
-
-	mtl.Color[0] = byte(mt.DiffuseColor.R * 255)
-	mtl.Color[1] = byte(mt.DiffuseColor.G * 255)
-	mtl.Color[2] = byte(mt.DiffuseColor.B * 255)
 	mstMh.Materials = append(mstMh.Materials, mtl)
 	return idx
 }

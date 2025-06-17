@@ -3,8 +3,8 @@ module github.com/flywave/go-3dasset
 go 1.23.7
 
 replace github.com/flywave/flywave-mesh => ../flywave-mesh
-replace github.com/flywave/go-topo => ../go-topo
 
+replace github.com/flywave/go-topo => ../go-topo
 
 require (
 	github.com/chai2010/tiff v0.0.0-20211005095045-4ec2aa243943
@@ -16,7 +16,7 @@ require (
 	github.com/flywave/go-mst v0.0.0-20250411081538-2c0bc0ea6e8b
 	github.com/flywave/go3d v0.0.0-20250314015505-bf0fda02e242
 	github.com/flywave/ofbx v1.0.1
-	golang.org/x/image v0.26.0
+	golang.org/x/image v0.28.0
 )
 
 require (
@@ -25,8 +25,8 @@ require (
 	github.com/edsrzf/mmap-go v1.0.0 // indirect
 	github.com/flywave/go-geo v0.0.0-20250317073920-04e3c9d74bb2 // indirect
 	github.com/flywave/go-geoid v0.0.0-20210705014121-cd8f70cb88bb // indirect
-	github.com/flywave/go-geom v0.0.0-20210811013133-346faa537513 // indirect
-	github.com/flywave/go-geos v0.0.0-20210901070302-5537e39a4985 // indirect
+	github.com/flywave/go-geom v0.0.0-20250607125323-f685bf20f12c // indirect
+	github.com/flywave/go-geos v0.0.0-20250617021757-c9fd6f65d66f // indirect
 	github.com/flywave/go-obj v0.0.0-20220925000332-cb9876e3c58b // indirect
 	github.com/flywave/go-ply v0.0.0-20210514091635-907bfc0b0e0b // indirect
 	github.com/flywave/go-proj v0.0.0-20250317074013-7323e93208df // indirect
