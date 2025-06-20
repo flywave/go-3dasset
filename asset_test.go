@@ -97,7 +97,10 @@ func TestFBX(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		if d.IsDir() || filepath.Ext(path) != ".fbx" {
+
+		ext := filepath.Ext(path)
+		ext = strings.ToLower(ext)
+		if d.IsDir() || ext != ".fbx" {
 			return nil
 		}
 
@@ -116,13 +119,13 @@ func TestFBX(t *testing.T) {
 }
 
 func TestFBX2(t *testing.T) {
-	ph := "/home/hj/snap/dukto/16/md/联通大楼.fbx"
+	ph := "./test/卷压机.FBX"
 	ots := FbxToMst{}
 	mh, _, _ := ots.Convert(ph)
 
 	doc, _ := mst.MstToGltf([]*mst.Mesh{mh})
 	glftbts, _ := mst.GetGltfBinary(doc, 8)
-	ph2 := "/home/hj/snap/dukto/16/md/联通大楼.glb"
+	ph2 := "./test/卷压机.glb"
 	f2, _ := os.Create(ph2)
 	f2.Write(glftbts)
 	f2.Close()
