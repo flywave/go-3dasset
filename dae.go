@@ -8,9 +8,9 @@ import (
 
 	dae "github.com/flywave/go-collada"
 	mst "github.com/flywave/go-mst"
-	dmat "github.com/flywave/go3d/float64/mat4"
-	dvec3 "github.com/flywave/go3d/float64/vec3"
-	dvec4 "github.com/flywave/go3d/float64/vec4"
+	mat4d "github.com/flywave/go3d/float64/mat4"
+	vec3d "github.com/flywave/go3d/float64/vec3"
+	vec4d "github.com/flywave/go3d/float64/vec4"
 	"github.com/flywave/go3d/vec2"
 	"github.com/flywave/go3d/vec3"
 )
@@ -26,7 +26,7 @@ type DaeToMst struct {
 func (cv *DaeToMst) Convert(path string) (*mst.Mesh, *[6]float64, error) {
 	mesh := mst.NewMesh()
 	var insts []*mst.InstanceMesh
-	ext := dvec3.MinBox
+	ext := vec3d.MinBox
 	instMp := make(map[string]*mst.InstanceMesh)
 
 	file, err := os.Open(path)
@@ -131,7 +131,7 @@ func (cv *DaeToMst) Convert(path string) (*mst.Mesh, *[6]float64, error) {
 	return mesh, ext.Array(), nil
 }
 
-func (cv *DaeToMst) convertMesh(geo *dae.Geometry, mstMesh *mst.Mesh, collada *dae.Collada, mat *dmat.T) *dvec3.Box {
+func (cv *DaeToMst) convertMesh(geo *dae.Geometry, mstMesh *mst.Mesh, collada *dae.Collada, mat *mat4d.T) *vec3d.Box {
 	mstNd := &mst.MeshNode{}
 	mh := geo.Mesh
 
@@ -178,7 +178,7 @@ func (cv *DaeToMst) convertMesh(geo *dae.Geometry, mstMesh *mst.Mesh, collada *d
 		}
 	}
 
-	bbx := dvec3.MinBox
+	bbx := vec3d.MinBox
 	for _, p := range mh.Vertices.Input {
 		bx := cv.parseVectorInuts(mh, p, srcMap, mstNd, mat)
 		bbx.Join(bx)
@@ -301,13 +301,13 @@ func (cv *DaeToMst) convertMtl(mesh *mst.Mesh, mtl *dae.Material, collada *dae.C
 	mesh.Materials = append(mesh.Materials, baseMtl)
 }
 
-func (cv *DaeToMst) parseVectorInuts(daeMh *dae.Mesh, input *dae.InputUnshared, srcMap map[string]*dae.Source, mstNd *mst.MeshNode, mat *dmat.T) *dvec3.Box {
+func (cv *DaeToMst) parseVectorInuts(daeMh *dae.Mesh, input *dae.InputUnshared, srcMap map[string]*dae.Source, mstNd *mst.MeshNode, mat *mat4d.T) *vec3d.Box {
 	srcId := input.Source.GetId()
 	src := srcMap[srcId]
 	ay := src.FloatArray.ToSlice()
 	stride := src.TechniqueCommon.Accessor.Stride
-	vt := dvec3.T{}
-	bbx := dvec3.MinBox
+	vt := vec3d.T{}
+	bbx := vec3d.MinBox
 	for _, fg := range mstNd.FaceGroup {
 		for _, f := range fg.Faces {
 			for _, i := range f.Vertex {
@@ -581,8 +581,8 @@ func (cv *DaeToMst) parseTrgTexCoordInuts(input *dae.InputShared, trg dae.Trig, 
 	}
 }
 
-func getNodeTransform(nd *dae.Node) []*dmat.T {
-	var mats []*dmat.T
+func getNodeTransform(nd *dae.Node) []*mat4d.T {
+	var mats []*mat4d.T
 	if len(nd.Matrix) > 0 {
 		var ay [16]float64
 		for _, m := range nd.Matrix {
@@ -599,10 +599,10 @@ func getNodeTransform(nd *dae.Node) []*dmat.T {
 			mats = append(mats, mat)
 		}
 	} else {
-		mt := &dmat.T{}
+		mt := &mat4d.T{}
 		for _, t := range nd.Rotate {
 			vs := t.ToSlice()
-			v := &dvec4.T{}
+			v := &vec4d.T{}
 			for i, str := range vs {
 				if i > 3 {
 					break
@@ -621,7 +621,7 @@ func getNodeTransform(nd *dae.Node) []*dmat.T {
 				mt.AssignZRotation(v[3])
 			}
 		}
-		scale := &dvec3.T{1, 1, 1}
+		scale := &vec3d.T{1, 1, 1}
 		if len(nd.Scale) > 0 {
 			t := nd.Scale[0]
 			vs := t.ToSlice()
@@ -637,7 +637,7 @@ func getNodeTransform(nd *dae.Node) []*dmat.T {
 		for _, t := range nd.Translate {
 			m := *mt
 			vs := t.ToSlice()
-			v := &dvec3.T{}
+			v := &vec3d.T{}
 			for i, str := range vs {
 				if i > 2 {
 					break
@@ -652,11 +652,11 @@ func getNodeTransform(nd *dae.Node) []*dmat.T {
 	return mats
 }
 
-func arryToMat(mat [16]float64) *dmat.T {
-	m := &dmat.T{}
-	m[0] = dvec4.T{mat[0], mat[1], mat[2], mat[3]}
-	m[1] = dvec4.T{mat[4], mat[5], mat[6], mat[7]}
-	m[2] = dvec4.T{mat[8], mat[9], mat[10], mat[11]}
-	m[3] = dvec4.T{mat[12], mat[13], mat[14], mat[15]}
+func arryToMat(mat [16]float64) *mat4d.T {
+	m := &mat4d.T{}
+	m[0] = vec4d.T{mat[0], mat[1], mat[2], mat[3]}
+	m[1] = vec4d.T{mat[4], mat[5], mat[6], mat[7]}
+	m[2] = vec4d.T{mat[8], mat[9], mat[10], mat[11]}
+	m[3] = vec4d.T{mat[12], mat[13], mat[14], mat[15]}
 	return m
 }

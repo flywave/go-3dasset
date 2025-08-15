@@ -13,9 +13,9 @@ import (
 	"math"
 
 	mst "github.com/flywave/go-mst"
-	dmat "github.com/flywave/go3d/float64/mat4"
-	"github.com/flywave/go3d/float64/quaternion"
-	dvec3 "github.com/flywave/go3d/float64/vec3"
+	mat4d "github.com/flywave/go3d/float64/mat4"
+	quatd "github.com/flywave/go3d/float64/quaternion"
+	vec3d "github.com/flywave/go3d/float64/vec3"
 
 	"github.com/flywave/go3d/vec2"
 	"github.com/flywave/go3d/vec3"
@@ -30,7 +30,7 @@ var (
 type GltfToMst struct {
 	mtlMap        map[uint32]map[uint32]bool
 	currentMeshId uint32
-	nodeMatrix    map[uint32]*dmat.T
+	nodeMatrix    map[uint32]*mat4d.T
 	parentMap     map[uint32]uint32
 	doc           *gltf.Document
 }
@@ -41,7 +41,7 @@ func (g *GltfToMst) Convert(path string) (*mst.Mesh, *[6]float64, error) {
 		return nil, nil, err
 	}
 	g.doc = doc
-	g.nodeMatrix = make(map[uint32]*dmat.T)
+	g.nodeMatrix = make(map[uint32]*mat4d.T)
 	g.parentMap = make(map[uint32]uint32)
 	return g.ConvertFromDoc(doc)
 }
@@ -184,7 +184,7 @@ func (g *GltfToMst) transMesh(doc *gltf.Document, mstMh *mst.Mesh, mhid uint32, 
 				err := readDataByAccessor(doc, acc, func(res interface{}) {
 					v := (*vec3.T)(res.(*[3]float32))
 					if mat != nil {
-						dv := dvec3.T{float64(v[0]), float64(v[1]), float64(v[2])}
+						dv := vec3d.T{float64(v[0]), float64(v[1]), float64(v[2])}
 						dv = mat.MulVec3(&dv)
 						v = &vec3.T{float32(dv[0]), float32(dv[1]), float32(dv[2])}
 					}
@@ -239,14 +239,14 @@ func (g *GltfToMst) transMesh(doc *gltf.Document, mstMh *mst.Mesh, mhid uint32, 
 	return bbx, nil
 }
 
-func (g *GltfToMst) getMatrix(idx uint32) *dmat.T {
+func (g *GltfToMst) getMatrix(idx uint32) *mat4d.T {
 	i, ok := g.parentMap[idx]
-	mat := dmat.Ident
+	mat := mat4d.Ident
 	if ok {
 		mat = *g.getMatrix(i)
 	}
 
-	mat2 := dmat.Ident
+	mat2 := mat4d.Ident
 	mt := g.nodeMatrix[idx]
 	if mt == nil {
 		return &mat2
@@ -427,7 +427,7 @@ func (g *GltfToMst) decodeImage(mime string, rd io.Reader) (*mst.Texture, error)
 	return nil, errors.New("not support image type")
 }
 
-func (g *GltfToMst) toMat(nd *gltf.Node) (*dmat.T, error) {
+func (g *GltfToMst) toMat(nd *gltf.Node) (*mat4d.T, error) {
 	var trans *[3]float32
 	var scl *[3]float32
 	var rots *[4]float32
@@ -479,10 +479,10 @@ func (g *GltfToMst) toMat(nd *gltf.Node) (*dmat.T, error) {
 		rots = &nd.Rotation
 	}
 
-	sc := dvec3.T{float64(scl[0]), float64(scl[1]), float64(scl[2])}
-	tra := dvec3.T{float64(trans[0]), float64(trans[1]), float64(trans[2])}
-	rot := quaternion.T{float64(rots[0]), float64(rots[1]), float64(rots[2]), float64(rots[3])}
-	mt := dmat.Compose(&tra, &rot, &sc)
+	sc := vec3d.T{float64(scl[0]), float64(scl[1]), float64(scl[2])}
+	tra := vec3d.T{float64(trans[0]), float64(trans[1]), float64(trans[2])}
+	rot := quatd.T{float64(rots[0]), float64(rots[1]), float64(rots[2]), float64(rots[3])}
+	mt := mat4d.Compose(&tra, &rot, &sc)
 	return mt, nil
 }
 

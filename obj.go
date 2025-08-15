@@ -7,7 +7,7 @@ import (
 
 	mst "github.com/flywave/go-mst"
 
-	dvec3 "github.com/flywave/go3d/float64/vec3"
+	vec3d "github.com/flywave/go3d/float64/vec3"
 	"github.com/flywave/go3d/vec2"
 	"github.com/flywave/go3d/vec3"
 )
@@ -16,7 +16,7 @@ type ObjToMst struct {
 }
 
 func (obj *ObjToMst) Convert(path string) (*mst.Mesh, *[6]float64, error) {
-	ext := dvec3.MinBox
+	ext := vec3d.MinBox
 	loader := &fmesh.ObjLoader{}
 	er := loader.LoadMesh(path)
 	if er != nil {
@@ -169,13 +169,13 @@ func toPbr(mtl fmesh.Material) *mst.PbrMaterial {
 	}
 }
 
-func (obj *ObjToMst) addTrigToMeshNode(mrg *mst.MeshTriangle, trg *fmesh.Triangle, nd *mst.MeshNode, groupmap map[uint32]int, ext *dvec3.Box) {
+func (obj *ObjToMst) addTrigToMeshNode(mrg *mst.MeshTriangle, trg *fmesh.Triangle, nd *mst.MeshNode, groupmap map[uint32]int, ext *vec3d.Box) {
 	v0 := &trg.Vertices[0]
 	v1 := &trg.Vertices[1]
 	v2 := &trg.Vertices[2]
-	ext.Extend(&dvec3.T{float64(v0.V[0]), float64(v0.V[1]), float64(v0.V[2])})
-	ext.Extend(&dvec3.T{float64(v1.V[0]), float64(v1.V[1]), float64(v1.V[2])})
-	ext.Extend(&dvec3.T{float64(v2.V[0]), float64(v2.V[1]), float64(v2.V[2])})
+	ext.Extend(&vec3d.T{float64(v0.V[0]), float64(v0.V[1]), float64(v0.V[2])})
+	ext.Extend(&vec3d.T{float64(v1.V[0]), float64(v1.V[1]), float64(v1.V[2])})
+	ext.Extend(&vec3d.T{float64(v2.V[0]), float64(v2.V[1]), float64(v2.V[2])})
 	mrg.Batchid = int32(trg.Mtl)
 
 	mrg.Faces = append(mrg.Faces, &mst.Face{Vertex: [3]uint32{uint32(len(nd.Vertices)), uint32(len(nd.Vertices) + 1), uint32(len(nd.Vertices) + 2)}})

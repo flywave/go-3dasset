@@ -8,10 +8,12 @@ import (
 	"strings"
 
 	mst "github.com/flywave/go-mst"
-	"github.com/flywave/go3d/float64/mat4"
-	dvec3 "github.com/flywave/go3d/float64/vec3"
+	mat4d "github.com/flywave/go3d/float64/mat4"
+	vec3d "github.com/flywave/go3d/float64/vec3"
+
 	"github.com/flywave/go3d/vec2"
 	"github.com/flywave/go3d/vec3"
+
 	fbx "github.com/flywave/ofbx"
 )
 
@@ -24,7 +26,7 @@ type FbxToMst struct {
 
 func (cv *FbxToMst) Convert(path string) (*mst.Mesh, *[6]float64, error) {
 	mesh := mst.NewMesh()
-	bbx := dvec3.MinBox
+	bbx := vec3d.MinBox
 
 	f, err := os.Open(path)
 	if err != nil {
@@ -76,16 +78,16 @@ func (cv *FbxToMst) Convert(path string) (*mst.Mesh, *[6]float64, error) {
 	return mesh, bbx.Array(), nil
 }
 
-func (cv *FbxToMst) convertMesh(mstMh *mst.Mesh, mh *fbx.Mesh) *dvec3.Box {
+func (cv *FbxToMst) convertMesh(mstMh *mst.Mesh, mh *fbx.Mesh) *vec3d.Box {
 	mhNode := &mst.MeshNode{}
-	bbx := dvec3.MinBox
+	bbx := vec3d.MinBox
 	g := mh.Geometry
 	if strings.HasPrefix(mh.Name(), "Cylinder67") {
 		fmt.Println(mh.Name())
 	}
 	mtx := fbx.GetGlobalMatrix(mh)
 	mary := mtx.ToArray()
-	matrix := mat4.FromArray(mary)
+	matrix := mat4d.FromArray(mary)
 
 	repete := false
 	batchs := g.Materials
@@ -131,10 +133,10 @@ func (cv *FbxToMst) convertMesh(mstMh *mst.Mesh, mh *fbx.Mesh) *dvec3.Box {
 			var tris [][]int
 			switch count {
 			case 4:
-				pts := []*dvec3.T{}
+				pts := []*vec3d.T{}
 				for _, f := range face {
 					v := g.Vertices[f]
-					pt := &dvec3.T{float64(v[0]), float64(v[1]), float64(v[2])}
+					pt := &vec3d.T{float64(v[0]), float64(v[1]), float64(v[2])}
 					pts = append(pts, pt)
 				}
 				tris = quadToTriangles(face, pts)
@@ -147,9 +149,9 @@ func (cv *FbxToMst) convertMesh(mstMh *mst.Mesh, mh *fbx.Mesh) *dvec3.Box {
 		for _, fc := range newFaces {
 			for _, f := range fc {
 				vt := g.Vertices[f]
-				dvt := matrix.MulVec3(&dvec3.T{float64(vt[0]), float64(vt[1]), float64(vt[2])})
+				dvt := matrix.MulVec3(&vec3d.T{float64(vt[0]), float64(vt[1]), float64(vt[2])})
 				mhNode.Vertices = append(mhNode.Vertices, vec3.T{float32(dvt[0]), float32(dvt[1]), float32(dvt[2])})
-				bbx.Extend((*dvec3.T)(&dvt))
+				bbx.Extend((*vec3d.T)(&dvt))
 			}
 			baseIdx := uint32(vertexOffset)
 			gp.Faces = append(gp.Faces, &mst.Face{
@@ -172,7 +174,7 @@ func pentagonToTriangles(pent []int) [][]int {
 	}
 }
 
-func quadToTriangles(quad []int, vertices []*dvec3.T) [][]int {
+func quadToTriangles(quad []int, vertices []*vec3d.T) [][]int {
 	p0, p1, p2, p3 := vertices[0], vertices[1], vertices[2], vertices[3]
 
 	// 计算对角线距离
@@ -193,7 +195,7 @@ func quadToTriangles(quad []int, vertices []*dvec3.T) [][]int {
 }
 
 // 计算两点间距离
-func distance(a, b *dvec3.T) float64 {
+func distance(a, b *vec3d.T) float64 {
 	dx := a[0] - b[0]
 	dy := a[2] - b[1]
 	dz := a[2] - b[2]

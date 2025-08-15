@@ -5,10 +5,11 @@ import (
 
 	tds "github.com/flywave/go-3ds"
 	mst "github.com/flywave/go-mst"
-	dmat "github.com/flywave/go3d/float64/mat4"
-	quat "github.com/flywave/go3d/float64/quaternion"
-	dvec3 "github.com/flywave/go3d/float64/vec3"
-	dvec4 "github.com/flywave/go3d/float64/vec4"
+
+	mat4d "github.com/flywave/go3d/float64/mat4"
+	quatd "github.com/flywave/go3d/float64/quaternion"
+	vec3d "github.com/flywave/go3d/float64/vec3"
+	vec4d "github.com/flywave/go3d/float64/vec4"
 
 	"github.com/flywave/go3d/vec2"
 	"github.com/flywave/go3d/vec3"
@@ -33,7 +34,7 @@ func (cv *ThreeDsToMst) Convert(path string) (*mst.Mesh, *[6]float64, error) {
 		ndMap[nd.InstanceName] = nd
 	}
 	cv.baseDir = filepath.Dir(path)
-	ext := dvec3.MinBox
+	ext := vec3d.MinBox
 	instMp := make(map[string]*mst.InstanceMesh)
 
 	for _, m := range mhs {
@@ -63,16 +64,16 @@ func (cv *ThreeDsToMst) Convert(path string) (*mst.Mesh, *[6]float64, error) {
 	return mesh, ext.Array(), nil
 }
 
-func (cv *ThreeDsToMst) convert3dsMesh(m *tds.Mesh, mstMesh *mst.Mesh, mtls []tds.Material) *dvec3.Box {
-	ext := dvec3.MinBox
+func (cv *ThreeDsToMst) convert3dsMesh(m *tds.Mesh, mstMesh *mst.Mesh, mtls []tds.Material) *vec3d.Box {
+	ext := vec3d.MinBox
 	nd := &mst.MeshNode{}
-	mat := dmat.Ident
+	mat := mat4d.Ident
 	for i, m := range m.Matrix {
-		mat[i] = dvec4.T{float64(m[0]), float64(m[1]), float64(m[2]), float64(m[3])}
+		mat[i] = vec4d.T{float64(m[0]), float64(m[1]), float64(m[2]), float64(m[3])}
 	}
 
 	for _, v := range m.Vertices {
-		vt := &dvec3.T{float64(v[0]), float64(v[1]), float64(v[2])}
+		vt := &vec3d.T{float64(v[0]), float64(v[1]), float64(v[2])}
 		*vt = mat.MulVec3(vt)
 		ext.Extend(vt)
 		nd.Vertices = append(nd.Vertices, vec3.T{float32(vt[0]), float32(vt[1]), float32(vt[2])})
@@ -135,11 +136,11 @@ func (cv *ThreeDsToMst) convert3dsMtl(mesh *mst.Mesh, m *tds.Material, repete bo
 	}
 }
 
-func (cv *ThreeDsToMst) toMat(nd *tds.MeshInstanceNode) *dmat.T {
-	m := &dmat.T{}
-	q := quat.FromVec4(&dvec4.T{float64(nd.Rot[0]), float64(nd.Rot[1]), float64(nd.Rot[2]), float64(nd.Rot[3])})
-	t := &dvec3.T{float64(nd.Pos[0]), float64(nd.Pos[1]), float64(nd.Pos[2])}
-	s := &dvec3.T{float64(nd.Scl[0]), float64(nd.Scl[1]), float64(nd.Scl[2])}
+func (cv *ThreeDsToMst) toMat(nd *tds.MeshInstanceNode) *mat4d.T {
+	m := &mat4d.T{}
+	q := quatd.FromVec4(&vec4d.T{float64(nd.Rot[0]), float64(nd.Rot[1]), float64(nd.Rot[2]), float64(nd.Rot[3])})
+	t := &vec3d.T{float64(nd.Pos[0]), float64(nd.Pos[1]), float64(nd.Pos[2])}
+	s := &vec3d.T{float64(nd.Scl[0]), float64(nd.Scl[1]), float64(nd.Scl[2])}
 	m.AssignQuaternion(&q)
 	m.ScaleVec3(s)
 	m.Translate(t)
