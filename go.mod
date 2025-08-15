@@ -15,7 +15,7 @@ require (
 	github.com/flywave/go-collada v0.0.0-20210617100142-f02e95c083a9
 	github.com/flywave/go-mst v0.0.0-20250411081538-2c0bc0ea6e8b
 	github.com/flywave/go3d v0.0.0-20250314015505-bf0fda02e242
-	github.com/flywave/ofbx v1.0.2-0.20250619102030-392281e7b840
+	github.com/flywave/ofbx v1.0.2-0.20250621073716-6719feb53699
 	golang.org/x/image v0.28.0
 )
 

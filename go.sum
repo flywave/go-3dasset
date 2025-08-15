@@ -57,10 +57,8 @@ github.com/flywave/go3d v0.0.0-20220209071216-2c50e8b3e7ff/go.mod h1:0/K6WtaMwhh
 github.com/flywave/go3d v0.0.0-20240109050628-b891a10fca74/go.mod h1:bvblxPT+cF0zgDi71CuusPPWCwqU0SikE9ySl2NzeQw=
 github.com/flywave/go3d v0.0.0-20250314015505-bf0fda02e242 h1:XU3CfYUCsQoAlTGMmbIWwUc7h4oPP6f7BjzffaObwP8=
 github.com/flywave/go3d v0.0.0-20250314015505-bf0fda02e242/go.mod h1:bvblxPT+cF0zgDi71CuusPPWCwqU0SikE9ySl2NzeQw=
-github.com/flywave/ofbx v1.0.1 h1:NLBjO174747Bxn9Qq41dIdsVPMb4okW0KIjERrz1KyU=
-github.com/flywave/ofbx v1.0.1/go.mod h1:4IKqGEjtQy59XKgqAghkb1bt7P9MnFLRva3iIvUYLW4=
-github.com/flywave/ofbx v1.0.2-0.20250619102030-392281e7b840 h1:IxAJfQ/zaWsTa7V2xD4dybe8oxE/T5ehpvb2GHL+MEs=
-github.com/flywave/ofbx v1.0.2-0.20250619102030-392281e7b840/go.mod h1:4IKqGEjtQy59XKgqAghkb1bt7P9MnFLRva3iIvUYLW4=
+github.com/flywave/ofbx v1.0.2-0.20250621073716-6719feb53699 h1:a260GsCtUuBltXpZkGxAYTLi9Sx+KL/x34NlR3nU3sw=
+github.com/flywave/ofbx v1.0.2-0.20250621073716-6719feb53699/go.mod h1:4IKqGEjtQy59XKgqAghkb1bt7P9MnFLRva3iIvUYLW4=
 github.com/fogleman/gg v1.3.0/go.mod h1:R/bRT+9gY/C5z7JzPU0zXsXHKM4/ayA+zqcVNZzPa1k=
 github.com/go-test/deep v1.0.1 h1:UQhStjbkDClarlmv0am7OXXO4/GaPdCGiUiMTvi28sg=
 github.com/go-test/deep v1.0.1/go.mod h1:wGDj63lr65AM2AQyKZd/NYHGb0R+1RLqB8NKt3aSFNA=

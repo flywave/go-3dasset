@@ -83,8 +83,7 @@ func (g *GltfToMst) processNode(i uint32, doc *gltf.Document, isInstance map[uin
 		return nil
 	}
 	if nd.Mesh != nil {
-		_, ok1 := nd.Extensions["EXT_mesh_gpu_instancing"]
-		// _, ok := isInstance[*nd.Mesh]
+		_, ok1 := isInstance[*nd.Mesh]
 		if ok1 {
 			isInstance[*nd.Mesh] = true
 		} else {
