@@ -119,13 +119,13 @@ func TestFBX(t *testing.T) {
 }
 
 func TestFBX2(t *testing.T) {
-	ph := "./test/卷压机.FBX"
+	ph := "./test/jyj.FBX"
 	ots := FbxToMst{}
 	mh, _, _ := ots.Convert(ph)
 
 	doc, _ := mst.MstToGltf([]*mst.Mesh{mh})
 	glftbts, _ := mst.GetGltfBinary(doc, 8)
-	ph2 := "./test/卷压机.glb"
+	ph2 := "./test/jyj.glb"
 	f2, _ := os.Create(ph2)
 	f2.Write(glftbts)
 	f2.Close()

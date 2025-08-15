@@ -116,21 +116,22 @@ func (obj *ObjToMst) Convert(path string) (*mst.Mesh, *[6]float64, error) {
 				texMtl.Texture = t
 			}
 
-			if mtl.Type == fmesh.MTL_BASE {
+			switch mtl.Type {
+			case fmesh.MTL_BASE:
 				if texMtl.Texture == nil {
 					mesh.Materials = append(mesh.Materials, &texMtl.BaseMaterial)
 				} else {
 					mesh.Materials = append(mesh.Materials, texMtl)
 				}
-			} else if mtl.Type == fmesh.MTL_LAMBERT {
+			case fmesh.MTL_LAMBERT:
 				mstMtl := toLambert(mtl)
 				mstMtl.TextureMaterial = *texMtl
 				mesh.Materials = append(mesh.Materials, mstMtl)
-			} else if mtl.Type == fmesh.MTL_PHONG {
+			case fmesh.MTL_PHONG:
 				mstMtl := toPhone(mtl)
 				mstMtl.TextureMaterial = *texMtl
 				mesh.Materials = append(mesh.Materials, mstMtl)
-			} else if mtl.Type == fmesh.MTL_PBR {
+			case fmesh.MTL_PBR:
 				mstMtl := toPbr(mtl)
 				mstMtl.TextureMaterial = *texMtl
 				mesh.Materials = append(mesh.Materials, mstMtl)

@@ -129,7 +129,8 @@ func (cv *FbxToMst) convertMesh(mstMh *mst.Mesh, mh *fbx.Mesh) *dvec3.Box {
 		newFaces := [][]int{face}
 		if count != 3 {
 			var tris [][]int
-			if count == 4 {
+			switch count {
+			case 4:
 				pts := []*dvec3.T{}
 				for _, f := range face {
 					v := g.Vertices[f]
@@ -137,7 +138,7 @@ func (cv *FbxToMst) convertMesh(mstMh *mst.Mesh, mh *fbx.Mesh) *dvec3.Box {
 					pts = append(pts, pt)
 				}
 				tris = quadToTriangles(face, pts)
-			} else if count == 5 {
+			case 5:
 				tris = pentagonToTriangles(face)
 			}
 			newFaces = tris
@@ -166,8 +167,8 @@ func (cv *FbxToMst) convertMesh(mstMh *mst.Mesh, mh *fbx.Mesh) *dvec3.Box {
 func pentagonToTriangles(pent []int) [][]int {
 	return [][]int{
 		{pent[0], pent[1], pent[2]}, // 三角形1
-		{pent[0], pent[2], pent[3]}, // 三角形2
-		{pent[0], pent[3], pent[4]}, // 三角形3
+		{pent[0], pent[2], pent[4]}, // 三角形2
+		{pent[2], pent[3], pent[4]}, // 三角形3
 	}
 }
 

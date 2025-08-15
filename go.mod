@@ -15,7 +15,7 @@ require (
 	github.com/flywave/go-collada v0.0.0-20210617100142-f02e95c083a9
 	github.com/flywave/go-mst v0.0.0-20250411081538-2c0bc0ea6e8b
 	github.com/flywave/go3d v0.0.0-20250314015505-bf0fda02e242
-	github.com/flywave/ofbx v1.0.1
+	github.com/flywave/ofbx v1.0.2-0.20250619102030-392281e7b840
 	golang.org/x/image v0.28.0
 )
 
@@ -37,6 +37,9 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/sherifabdlnaby/semaphore v1.1.0 // indirect
 	github.com/shopspring/decimal v1.2.0 // indirect
-	golang.org/x/sync v0.13.0 // indirect
-	golang.org/x/sys v0.20.0 // indirect
+	golang.org/x/sys v0.33.0 // indirect
 )
+
+replace github.com/flywave/go-geos => ../go-geos
+
+replace github.com/flywave/go-geoid => ../go-geoid

@@ -11,8 +11,9 @@ import (
 	"os"
 
 	"github.com/chai2010/tiff"
-	mst "github.com/flywave/go-mst"
 	"golang.org/x/image/bmp"
+
+	mst "github.com/flywave/go-mst"
 )
 
 func convertTex(path string, texId int) (*mst.Texture, error) {

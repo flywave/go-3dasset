@@ -24,7 +24,7 @@ import (
 )
 
 var (
-	emptyMatrix = [16]float64{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+	EmptyMatrix = [16]float64{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
 )
 
 type GltfToMst struct {
@@ -262,42 +262,47 @@ func readDataByAccessor(doc *gltf.Document, acc *gltf.Accessor, procces func(int
 	bf := bytes.NewBuffer(buffer.Data[int(bv.ByteOffset+acc.ByteOffset):int(bv.ByteOffset+bv.ByteLength)])
 
 	var fcs interface{}
-	if acc.Type == gltf.AccessorVec2 {
-		if acc.ComponentType == gltf.ComponentUshort {
+	switch acc.Type {
+	case gltf.AccessorVec2:
+		switch acc.ComponentType {
+		case gltf.ComponentUshort:
 			fcs = &[2]uint16{}
-		} else if acc.ComponentType == gltf.ComponentUint {
+		case gltf.ComponentUint:
 			fcs = &[2]uint32{}
-		} else if acc.ComponentType == gltf.ComponentFloat {
+		case gltf.ComponentFloat:
 			fcs = &[2]float32{}
 		}
-	} else if acc.Type == gltf.AccessorVec3 {
-		if acc.ComponentType == gltf.ComponentUshort {
+	case gltf.AccessorVec3:
+		switch acc.ComponentType {
+		case gltf.ComponentUshort:
 			fcs = &[3]uint16{}
-		} else if acc.ComponentType == gltf.ComponentUint {
+		case gltf.ComponentUint:
 			fcs = &[3]uint32{}
-		} else if acc.ComponentType == gltf.ComponentFloat {
+		case gltf.ComponentFloat:
 			fcs = &[3]float32{}
 		}
-	} else if acc.Type == gltf.AccessorVec4 {
-		if acc.ComponentType == gltf.ComponentUshort {
+	case gltf.AccessorVec4:
+		switch acc.ComponentType {
+		case gltf.ComponentUshort:
 			fcs = &[4]uint16{}
-		} else if acc.ComponentType == gltf.ComponentUint {
+		case gltf.ComponentUint:
 			fcs = &[4]uint32{}
-		} else if acc.ComponentType == gltf.ComponentFloat {
+		case gltf.ComponentFloat:
 			fcs = &[4]float32{}
 		}
-	} else if acc.Type == gltf.AccessorScalar {
-		if acc.ComponentType == gltf.ComponentUshort {
+	case gltf.AccessorScalar:
+		switch acc.ComponentType {
+		case gltf.ComponentUshort:
 			n := uint16(0)
 			fcs = &n
-		} else if acc.ComponentType == gltf.ComponentUint {
+		case gltf.ComponentUint:
 			n := uint32(0)
 			fcs = &n
-		} else if acc.ComponentType == gltf.ComponentFloat {
+		case gltf.ComponentFloat:
 			n := float32(0)
 			fcs = &n
 		}
-	} else {
+	default:
 		return errors.New("acc have no type")
 	}
 
@@ -393,9 +398,10 @@ func (g *GltfToMst) decodeImage(mime string, rd io.Reader) (*mst.Texture, error)
 	var img image.Image
 	var err error
 	tex := &mst.Texture{}
-	if mime == "image/png" {
+	switch mime {
+	case "image/png":
 		img, err = png.Decode(rd)
-	} else if mime == "image/jpg" || mime == "image/jpeg" {
+	case "image/jpg", "image/jpeg":
 		img, err = jpeg.Decode(rd)
 	}
 	if err != nil {

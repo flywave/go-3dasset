@@ -314,11 +314,12 @@ func (cv *DaeToMst) parseVectorInuts(daeMh *dae.Mesh, input *dae.InputUnshared, 
 				vt[0], _ = strconv.ParseFloat(ay[int(i)*stride], 64)
 				vt[1], _ = strconv.ParseFloat(ay[int(i)*stride+1], 64)
 				vt[2], _ = strconv.ParseFloat(ay[int(i)*stride+2], 64)
-				if input.Semantic == "POSITION" {
+				switch input.Semantic {
+				case "POSITION":
 					vt = mat.MulVec3(&vt)
 					mstNd.Vertices = append(mstNd.Vertices, vec3.T{float32(vt[0]), float32(vt[1]), float32(vt[2])})
 					bbx.Extend(&vt)
-				} else if input.Semantic == "NORMAL" {
+				case "NORMAL":
 					mstNd.Normals = append(mstNd.Normals, vec3.T{float32(vt[0]), float32(vt[1]), float32(vt[2])})
 				}
 			}
@@ -366,13 +367,14 @@ func (cv *DaeToMst) parsePolyInuts(plist *dae.Polylist, srcMap map[string]*dae.S
 			fs[k] = int(v)
 			j += inputCount
 		}
-		if count == 3 {
+		switch count {
+		case 3:
 			f := [3]uint32{}
 			f[0] = uint32(fs[0])
 			f[1] = uint32(fs[1])
 			f[2] = uint32(fs[2])
 			faceG.Faces = append(faceG.Faces, &mst.Face{Vertex: f})
-		} else if count == 4 {
+		case 4:
 			f := [3]uint32{}
 			f[0] = uint32(fs[0])
 			f[1] = uint32(fs[1])
