@@ -146,3 +146,6 @@ func (cv *ThreeDsToMst) toMat(nd *tds.MeshInstanceNode) *mat4d.T {
 	m.Translate(t)
 	return m
 }
+
+// Ensure ThreeDsToMst implements FormatConvert interface
+var _ FormatConvert = (*ThreeDsToMst)(nil)

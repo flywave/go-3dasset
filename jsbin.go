@@ -26,3 +26,6 @@ func getBBoxFromMst(mh *mst.Mesh) *vec3d.Box {
 	}
 	return &bbx
 }
+
+// Ensure ThreejsBinToMst implements FormatConvert interface
+var _ FormatConvert = (*ThreejsBinToMst)(nil)

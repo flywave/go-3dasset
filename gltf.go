@@ -495,3 +495,6 @@ func addPoint(bx *[6]float64, p *[3]float64) {
 	bx[4] = math.Max(bx[4], p[1])
 	bx[5] = math.Max(bx[5], p[2])
 }
+
+// Ensure GltfToMst implements FormatConvert interface
+var _ FormatConvert = (*GltfToMst)(nil)

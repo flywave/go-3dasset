@@ -660,3 +660,6 @@ func arryToMat(mat [16]float64) *mat4d.T {
 	m[3] = vec4d.T{mat[12], mat[13], mat[14], mat[15]}
 	return m
 }
+
+// Ensure DaeToMst implements FormatConvert interface
+var _ FormatConvert = (*DaeToMst)(nil)

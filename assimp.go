@@ -71,22 +71,6 @@ func (a *AssimpToMst) convertWithFlags(path string, postProcessFlags assimp.Post
 	return mstMesh, bbox.Array(), nil
 }
 
-// GetSupportedFormats returns the list of formats supported by ASSIMP
-func (a *AssimpToMst) GetSupportedFormats() []string {
-	return []string{
-		".3ds", ".ase", ".obj", ".fbx", ".dae", ".blend", ".3mf",
-		".ply", ".stl", ".x", ".dxf", ".lwo", ".lws", ".md5",
-		".md3", ".md2", ".nff", ".raw", ".ac", ".ms3d", ".cob",
-		".q3o", ".q3s", ".pk3", ".mdc", ".mdl", ".hmp", ".ter",
-		".mdl", ".ase", ".ifc", ".step", ".iges", ".3d", ".b3d",
-		".q3d", ".smd", ".vta", ".m3", ".3d", ".mdl", ".md2",
-		".md3", ".mdc", ".md5", ".smd", ".vta", ".obj", ".ply",
-		".stl", ".3ds", ".ase", ".lwo", ".lws", ".x", ".ac",
-		".ms3d", ".cob", ".q3o", ".q3s", ".pk3", ".mdc", ".mdl",
-		".hmp", ".ter", ".mdl", ".ase", ".ifc", ".step", ".iges",
-	}
-}
-
 // IsFormatSupported checks if a given file extension is supported
 func (a *AssimpToMst) IsFormatSupported(ext string) bool {
 	ext = strings.ToLower(ext)
@@ -102,6 +86,22 @@ func (a *AssimpToMst) IsFormatSupported(ext string) bool {
 // GetFileExtension returns the file extension from a path
 func (a *AssimpToMst) GetFileExtension(path string) string {
 	return filepath.Ext(path)
+}
+
+// GetSupportedFormats returns the list of formats supported by ASSIMP
+func (a *AssimpToMst) GetSupportedFormats() []string {
+	// 使用go-assimp的动态格式检测
+	formats := assimp.GetAllSupportedFormats()
+
+	// 转换为带点的扩展名格式
+	extensions := make([]string, 0, len(formats))
+	for _, format := range formats {
+		if format != "" {
+			extensions = append(extensions, "."+format)
+		}
+	}
+
+	return extensions
 }
 
 // Ensure AssimpToMst implements FormatConvert interface

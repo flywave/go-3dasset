@@ -259,3 +259,6 @@ func (cv *FbxToMst) convertMaterial(mstMh *mst.Mesh, mt *fbx.Material, repete bo
 	mstMh.Materials = append(mstMh.Materials, mtl)
 	return idx
 }
+
+// Ensure FbxToMst implements FormatConvert interface
+var _ FormatConvert = (*FbxToMst)(nil)

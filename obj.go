@@ -396,3 +396,6 @@ func (obj *ObjToMst) calculateNormal(v0, v1, v2 vec3.T) vec3.T {
 	}
 	return vec3.T{0, 1, 0} // Default normal
 }
+
+// Ensure ObjToMst implements FormatConvert interface
+var _ FormatConvert = (*ObjToMst)(nil)
