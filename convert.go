@@ -22,6 +22,8 @@ func FormatFactory(format string) FormatConvert {
 		return &ObjToMst{}
 	case TBIN:
 		return &ThreejsBinToMst{}
+	case STL:
+		return &StlToMst{}
 	}
 	return nil
 }

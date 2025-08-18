@@ -10,4 +10,5 @@ const (
 	DAE     = ".dae"
 	FBX     = ".fbx"
 	TBIN    = ".bin"
+	STL     = ".stl"
 )
