@@ -11,4 +11,5 @@ const (
 	FBX     = ".fbx"
 	TBIN    = ".bin"
 	STL     = ".stl"
+	RVM     = ".rvm"
 )
