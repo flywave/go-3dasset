@@ -127,7 +127,7 @@ func (cv *DaeToMst) Convert(path string) (*mst.Mesh, *[6]float64, error) {
 	for _, ins := range instMp {
 		insts = append(insts, ins)
 	}
-	mesh.InstanceNode = insts
+	mesh.Instances = insts
 	return mesh, ext.Array(), nil
 }
 

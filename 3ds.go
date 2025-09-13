@@ -58,7 +58,7 @@ func (cv *ThreeDsToMst) Convert(path string) (*mst.Mesh, *[6]float64, error) {
 		}
 	}
 	for _, ins := range instMp {
-		mesh.InstanceNode = append(mesh.InstanceNode, ins)
+		mesh.Instances = append(mesh.Instances, ins)
 	}
 
 	return mesh, ext.Array(), nil

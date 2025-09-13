@@ -71,7 +71,7 @@ func (g *GltfToMst) ConvertFromDoc(doc *gltf.Document) (*mst.Mesh, *[6]float64, 
 		}
 	}
 	for _, v := range instMp {
-		mesh.InstanceNode = append(mesh.InstanceNode, v)
+		mesh.Instances = append(mesh.Instances, v)
 	}
 	return mesh, bbx, nil
 }
@@ -136,7 +136,7 @@ func (g *GltfToMst) processMesh(doc *gltf.Document, instMp map[uint32]*mst.Insta
 	}
 
 	for _, v := range instMp {
-		mesh.InstanceNode = append(mesh.InstanceNode, v)
+		mesh.Instances = append(mesh.Instances, v)
 	}
 	return nil
 }

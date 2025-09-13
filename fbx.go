@@ -74,7 +74,7 @@ func (cv *FbxToMst) Convert(path string) (*mst.Mesh, *[6]float64, error) {
 	for _, v := range instMp {
 		insts = append(insts, v)
 	}
-	mesh.InstanceNode = insts
+	mesh.Instances = insts
 	return mesh, bbx.Array(), nil
 }
 
