@@ -59,7 +59,7 @@ func (g *GltfToMst) ConvertFromDoc(doc *gltf.Document) (*mst.Mesh, *[6]float64, 
 	}
 
 	instMp := make(map[uint32]*mst.InstanceMesh)
-	for _, idx := range doc.Scenes[0].Nodes {
+	for idx := range doc.Nodes {
 		nd := doc.Nodes[idx]
 		if nd.Mesh != nil {
 			v := isInstance[g.currentMeshId]
@@ -77,7 +77,7 @@ func (g *GltfToMst) ConvertFromDoc(doc *gltf.Document) (*mst.Mesh, *[6]float64, 
 }
 
 func (g *GltfToMst) processNode(i uint32, doc *gltf.Document, isInstance map[uint32]bool) error {
-	nd := doc.Nodes[i]
+	nd := *doc.Nodes[i]
 	_, ok := g.nodeMatrix[uint32(i)]
 	if ok {
 		return nil
@@ -427,7 +427,7 @@ func (g *GltfToMst) decodeImage(mime string, rd io.Reader) (*mst.Texture, error)
 	return nil, errors.New("not support image type")
 }
 
-func (g *GltfToMst) toMat(nd *gltf.Node) (*mat4d.T, error) {
+func (g *GltfToMst) toMat(nd gltf.Node) (*mat4d.T, error) {
 	var trans *[3]float32
 	var scl *[3]float32
 	var rots *[4]float32
