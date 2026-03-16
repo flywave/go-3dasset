@@ -16,9 +16,11 @@ import (
 )
 
 type TilesObjToMst struct {
-	currentPath string
-	origin      [3]float64
-	ApplyOrigin bool
+	currentPath      string
+	origin           [3]float64
+	ApplyOrigin      bool
+	textureIdCounter int
+	textureMap       map[string]*mst.Texture
 }
 
 type ModelMetadata struct {
@@ -26,8 +28,10 @@ type ModelMetadata struct {
 	SRSOrigin string `xml:"SRSOrigin"`
 }
 
-func (t *TilesObjToMst) Convert(path string) (*mst.Mesh, *[6]float64, error) {
+func (t *TilesObjToMst) ConvertMultiple(path string) ([]*mst.Mesh, *[6]float64, error) {
 	t.currentPath = path
+	t.textureMap = make(map[string]*mst.Texture)
+	t.textureIdCounter = 0
 
 	metadataPath := filepath.Join(path, "metadata.xml")
 	if err := t.parseMetadata(metadataPath); err != nil {
@@ -39,7 +43,7 @@ func (t *TilesObjToMst) Convert(path string) (*mst.Mesh, *[6]float64, error) {
 		return nil, nil, err
 	}
 
-	mesh := mst.NewMesh()
+	var meshes []*mst.Mesh
 	ext := vec3d.MinBox
 
 	tileDirs, err := filepath.Glob(filepath.Join(dataDir, "Tile_*"))
@@ -52,14 +56,35 @@ func (t *TilesObjToMst) Convert(path string) (*mst.Mesh, *[6]float64, error) {
 		if err != nil {
 			continue
 		}
+		if len(objFiles) == 0 {
+			continue
+		}
+
+		mesh := mst.NewMesh()
+
 		for _, objFile := range objFiles {
 			if err := t.processObjFile(objFile, mesh, &ext); err != nil {
 				continue
 			}
 		}
+
+		if len(mesh.Nodes) > 0 {
+			meshes = append(meshes, mesh)
+		}
 	}
 
-	return mesh, ext.Array(), nil
+	return meshes, ext.Array(), nil
+}
+
+func (t *TilesObjToMst) Convert(path string) (*mst.Mesh, *[6]float64, error) {
+	meshes, ext, err := t.ConvertMultiple(path)
+	if err != nil {
+		return nil, ext, err
+	}
+	if len(meshes) == 0 {
+		return nil, ext, nil
+	}
+	return meshes[0], ext, nil
 }
 
 func ReadTileOrigin(path string) (vec3d.T, error) {
@@ -108,6 +133,20 @@ func (t *TilesObjToMst) parseMetadata(path string) error {
 
 func ConvertToGlb(mesh *mst.Mesh, path string) error {
 	doc, err := mst.MstToGltf([]*mst.Mesh{mesh})
+	if err != nil {
+		return err
+	}
+
+	data, err := mst.GetGltfBinary(doc, 4)
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(path, data, 0644)
+}
+
+func ConvertToGlbMultiple(meshes []*mst.Mesh, path string) error {
+	doc, err := mst.MstToGltf(meshes)
 	if err != nil {
 		return err
 	}
@@ -265,10 +304,17 @@ func (t *TilesObjToMst) loadTexture(texturePath string, objPath string) *mst.Tex
 		}
 	}
 
-	texture, err := convertTex(fullPath, 0)
+	if cached, exists := t.textureMap[fullPath]; exists {
+		return cached
+	}
+
+	texture, err := convertTex(fullPath, t.textureIdCounter)
 	if err != nil {
 		return nil
 	}
+
+	t.textureIdCounter++
+	t.textureMap[fullPath] = texture
 
 	return texture
 }
