@@ -1,15 +1,17 @@
 package asset3d
 
 const (
-	GLB     = ".glb"
-	OBJ     = ".obj"
-	MTL     = ".mtl"
-	GLTF    = ".gltf"
-	IFC     = ".ifc"
-	THREEDS = ".3ds"
-	DAE     = ".dae"
-	FBX     = ".fbx"
-	TBIN    = ".bin"
-	STL     = ".stl"
-	RVM     = ".rvm"
+	GLB        = ".glb"
+	OBJ        = ".obj"
+	MTL        = ".mtl"
+	GLTF       = ".gltf"
+	IFC        = ".ifc"
+	THREEDS    = ".3ds"
+	DAE        = ".dae"
+	FBX        = ".fbx"
+	TBIN       = ".bin"
+	STL        = ".stl"
+	RVM        = ".rvm"
+	TILES_OBJ  = "tiles_obj"
+	TILES_OSGB = "tiles_osgb"
 )

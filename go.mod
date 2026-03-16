@@ -17,6 +17,7 @@ require (
 	github.com/flywave/go-collada v0.0.0-20210617100142-f02e95c083a9
 	github.com/flywave/go-mst v0.0.0-20250814104510-37f0a6660bc0
 	github.com/flywave/go-obj v0.0.0-20250815235847-2e1d7495ae52
+	github.com/flywave/go-osg v0.0.0-00010101000000-000000000000
 	github.com/flywave/go-rvm v0.0.0-00010101000000-000000000000
 	github.com/flywave/go-stl v0.0.0-20250818070638-f2c3dee7ad76
 	github.com/flywave/go3d v0.0.0-20250816053852-aed5d825659f
@@ -48,3 +49,5 @@ replace github.com/flywave/gltf => ../gltf
 replace github.com/flywave/go-draco => ../go-draco
 
 replace github.com/flywave/go-meshopt => ../go-meshopt
+
+replace github.com/flywave/go-osg => ../go-osg

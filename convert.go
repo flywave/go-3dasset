@@ -26,6 +26,10 @@ func FormatFactory(format string) FormatConvert {
 		return &StlToMst{}
 	case RVM:
 		return &RvmToMst{}
+	case TILES_OBJ:
+		return &TilesObjToMst{}
+	case TILES_OSGB:
+		return &TilesOsgbToMst{}
 	}
 	return nil
 }
