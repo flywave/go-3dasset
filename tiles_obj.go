@@ -218,7 +218,7 @@ func (t *TilesObjToMst) createMaterials(reader *gobj.ObjReader, materialIndexMap
 		if objMat == nil {
 			material = &mst.BaseMaterial{
 				Color:        [3]byte{200, 200, 200},
-				Transparency: 1.0,
+				Transparency: 0,
 			}
 		} else {
 			material = t.convertMaterial(objMat, objPath)
@@ -236,7 +236,7 @@ func (t *TilesObjToMst) convertMaterial(objMat *gobj.Material, objPath string) m
 	textureMat := &mst.TextureMaterial{
 		BaseMaterial: mst.BaseMaterial{
 			Color:        diffuseColor,
-			Transparency: float32(objMat.Opacity),
+			Transparency: 1 - float32(objMat.Opacity),
 		},
 	}
 

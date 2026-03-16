@@ -2,6 +2,7 @@ package asset3d
 
 import (
 	"encoding/xml"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -124,9 +125,9 @@ func (t *TilesOsgbToMst) parseMetadata(path string) error {
 func (t *TilesOsgbToMst) processOsgbFile(osgbPath string, mesh *mst.Mesh, ext *vec3d.Box) error {
 	defer func() {
 		if r := recover(); r != nil {
-			// log the error and		}
+			fmt.Printf("[ERROR] Recovered from panic: %v\n", r)
 		}
-	}
+	}()
 
 	absPath, _ := filepath.Abs(osgbPath)
 	if t.loadedFiles[absPath] {
@@ -137,8 +138,11 @@ func (t *TilesOsgbToMst) processOsgbFile(osgbPath string, mesh *mst.Mesh, ext *v
 	rw := osg.NewReadWrite()
 	result := rw.ReadNode(osgbPath, nil)
 	if result == nil || result.GetNode() == nil {
+		fmt.Printf("[DEBUG] result or GetNode is nil for %s\n", osgbPath)
 		return nil
 	}
+
+	fmt.Printf("[DEBUG] Successfully read %s, node type: %T\n", osgbPath, result.GetNode())
 
 	node := result.GetNode()
 	t.traverseNode(node, mesh, ext, filepath.Dir(osgbPath))
