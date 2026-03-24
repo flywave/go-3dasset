@@ -10,6 +10,7 @@ import (
 	mst "github.com/flywave/go-mst"
 	osg "github.com/flywave/go-osg"
 	"github.com/flywave/go-osg/model"
+	pj "github.com/flywave/go-proj"
 	vec3d "github.com/flywave/go3d/float64/vec3"
 
 	"github.com/flywave/go3d/vec2"
@@ -20,8 +21,10 @@ type TilesOsgbToMst struct {
 	currentPath string
 	dataPath    string
 	origin      [3]float64
+	srs         string
 	loadedFiles map[string]bool
 	ApplyOrigin bool
+	GeoRef      *mst.GeoRef
 }
 
 func (t *TilesOsgbToMst) ConvertMultiple(path string) ([]*mst.Mesh, *[6]float64, error) {
@@ -46,6 +49,10 @@ func (t *TilesOsgbToMst) ConvertMultiple(path string) ([]*mst.Mesh, *[6]float64,
 		mesh := mst.NewMesh()
 		t.processOsgbFile(mainFile, mesh, &ext)
 		if len(mesh.Nodes) > 0 {
+			geoRef := t.computeGeoRef()
+			if geoRef != nil {
+				mesh.GeoRef = geoRef
+			}
 			meshes = append(meshes, mesh)
 		}
 	}
@@ -62,6 +69,10 @@ func (t *TilesOsgbToMst) ConvertMultiple(path string) ([]*mst.Mesh, *[6]float64,
 				mesh := mst.NewMesh()
 				t.processOsgbFile(finestFile, mesh, &ext)
 				if len(mesh.Nodes) > 0 {
+					geoRef := t.computeGeoRef()
+					if geoRef != nil {
+						mesh.GeoRef = geoRef
+					}
 					meshes = append(meshes, mesh)
 				}
 			}
@@ -131,6 +142,7 @@ func (t *TilesOsgbToMst) parseMetadata(path string) error {
 		return err
 	}
 
+	t.srs = metadata.SRS
 	parts := strings.Split(metadata.SRSOrigin, ",")
 	if len(parts) >= 3 {
 		t.origin[0] = parseFloat(parts[0])
@@ -139,6 +151,45 @@ func (t *TilesOsgbToMst) parseMetadata(path string) error {
 	}
 
 	return nil
+}
+
+func (t *TilesOsgbToMst) computeGeoRef() *mst.GeoRef {
+	if t.GeoRef != nil {
+		return t.GeoRef
+	}
+
+	if t.srs == "" || t.srs == "unknown" {
+		return nil
+	}
+
+	proj, err := pj.NewProj(t.srs)
+	if err != nil {
+		return nil
+	}
+	defer proj.Close()
+
+	wgs84, err := pj.NewProj("+proj=longlat +datum=WGS84 +no_defs")
+	if err != nil {
+		return nil
+	}
+	defer wgs84.Close()
+
+	lon, lat, err := pj.Transform2(proj, wgs84, t.origin[0], t.origin[1])
+	if err != nil {
+		return nil
+	}
+
+	alt := t.origin[2]
+
+	ecefX, ecefY, ecefZ, err := pj.Lonlat2Ecef(lon, lat, alt)
+	if err != nil {
+		return nil
+	}
+
+	return &mst.GeoRef{
+		EcefOrigin:   [3]float64{ecefX, ecefY, ecefZ},
+		LatLonOrigin: [3]float64{lat, lon, alt},
+	}
 }
 
 func (t *TilesOsgbToMst) processOsgbFile(osgbPath string, mesh *mst.Mesh, ext *vec3d.Box) error {

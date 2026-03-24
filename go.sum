@@ -22,8 +22,6 @@ github.com/flywave/go-collada v0.0.0-20210617100142-f02e95c083a9 h1:b0A/1cpRTkj8
 github.com/flywave/go-collada v0.0.0-20210617100142-f02e95c083a9/go.mod h1:9SnDxogAOx4IsfCcDKOvHXbqGtalRPGkI3Ot0W5Rvmo=
 github.com/flywave/go-obj v0.0.0-20250815235847-2e1d7495ae52 h1:MQKNZuJtBstT36I1PGOPzoDIXmzaa62lCdXNdX7WBUE=
 github.com/flywave/go-obj v0.0.0-20250815235847-2e1d7495ae52/go.mod h1:dC5WMiFR2doIzp7MkTfeQR/CnuBrhtcY1V+6wL1J7Yg=
-github.com/flywave/go-proj v0.0.0-20250317074013-7323e93208df h1:fG0E6JoSWBgnIESzKJbEmwWn8K8kcpCtWv/1X/maz4A=
-github.com/flywave/go-proj v0.0.0-20250317074013-7323e93208df/go.mod h1:RX83BRZNwcerL4DIU5TqQyKarhYx8W/cwTMYfSAwXiE=
 github.com/flywave/go-stl v0.0.0-20250818070638-f2c3dee7ad76 h1:zwgkaN3wUdOg/tZF+buz6UJsFU8paJp96nGaO6tZMDo=
 github.com/flywave/go-stl v0.0.0-20250818070638-f2c3dee7ad76/go.mod h1:cBGuHNXnPHNc4PH+uqkqPoTvdym4wpTXNZnVOnHHbYs=
 github.com/flywave/go3d v0.0.0-20210529142521-14eb5aca1290/go.mod h1:QbQZlarSgCPYFAmoTduiDUd4JCnolimXUswTAnSrFWY=
