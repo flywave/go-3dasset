@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	mst "github.com/flywave/go-mst"
 )
 
 func TestTilesObjConvert(t *testing.T) {
@@ -35,6 +37,36 @@ func TestTilesObjConvert(t *testing.T) {
 
 	outputDir := "./test_output"
 	os.MkdirAll(outputDir, 0755)
+
+	if len(meshes) == 1 {
+		mstPath := filepath.Join(outputDir, "tiles_obj_multi.mst")
+		start = time.Now()
+		err = mst.MeshWriteTo(mstPath, meshes[0])
+		if err != nil {
+			t.Fatalf("MeshWriteTo failed: %v", err)
+		}
+		t.Logf("MST saved to %s, Duration: %v", mstPath, time.Since(start))
+	} else if len(meshes) > 1 {
+		mergedMesh := mst.NewMesh()
+		for i := range meshes {
+			offset := uint32(len(mergedMesh.Materials))
+			for _, node := range meshes[i].Nodes {
+				for _, fg := range node.FaceGroup {
+					fg.Batchid += int32(offset)
+				}
+			}
+			mergedMesh.Materials = append(mergedMesh.Materials, meshes[i].Materials...)
+			mergedMesh.Nodes = append(mergedMesh.Nodes, meshes[i].Nodes...)
+		}
+		mstPath := filepath.Join(outputDir, "tiles_obj_multi.mst")
+		start = time.Now()
+		err = mst.MeshWriteTo(mstPath, mergedMesh)
+		if err != nil {
+			t.Fatalf("MeshWriteTo failed: %v", err)
+		}
+		t.Logf("MST saved to %s (%d tiles merged), Duration: %v", mstPath, len(meshes), time.Since(start))
+	}
+
 	glbPath := filepath.Join(outputDir, "tiles_obj_multi.glb")
 	start = time.Now()
 	err = ConvertToGlbMultiple(meshes, glbPath)
@@ -74,6 +106,15 @@ func TestTilesObjConvertWithOrigin(t *testing.T) {
 
 	outputDir := "./test_output"
 	os.MkdirAll(outputDir, 0755)
+
+	mstPath := filepath.Join(outputDir, "tiles_obj_world.mst")
+	start = time.Now()
+	err = mst.MeshWriteTo(mstPath, mesh)
+	if err != nil {
+		t.Fatalf("MeshWriteTo failed: %v", err)
+	}
+	t.Logf("MST saved to %s, Duration: %v", mstPath, time.Since(start))
+
 	glbPath := filepath.Join(outputDir, "tiles_obj_world.glb")
 	start = time.Now()
 	err = ConvertToGlb(mesh, glbPath)
@@ -117,6 +158,36 @@ func TestTilesOsgbConvert(t *testing.T) {
 
 	outputDir := "./test_output"
 	os.MkdirAll(outputDir, 0755)
+
+	if len(meshes) == 1 {
+		mstPath := filepath.Join(outputDir, "tiles_osgb_multi.mst")
+		start = time.Now()
+		err = mst.MeshWriteTo(mstPath, meshes[0])
+		if err != nil {
+			t.Fatalf("MeshWriteTo failed: %v", err)
+		}
+		t.Logf("MST saved to %s, Duration: %v", mstPath, time.Since(start))
+	} else if len(meshes) > 1 {
+		mergedMesh := mst.NewMesh()
+		for i := range meshes {
+			offset := uint32(len(mergedMesh.Materials))
+			for _, node := range meshes[i].Nodes {
+				for _, fg := range node.FaceGroup {
+					fg.Batchid += int32(offset)
+				}
+			}
+			mergedMesh.Materials = append(mergedMesh.Materials, meshes[i].Materials...)
+			mergedMesh.Nodes = append(mergedMesh.Nodes, meshes[i].Nodes...)
+		}
+		mstPath := filepath.Join(outputDir, "tiles_osgb_multi.mst")
+		start = time.Now()
+		err = mst.MeshWriteTo(mstPath, mergedMesh)
+		if err != nil {
+			t.Fatalf("MeshWriteTo failed: %v", err)
+		}
+		t.Logf("MST saved to %s (%d tiles merged), Duration: %v", mstPath, len(meshes), time.Since(start))
+	}
+
 	glbPath := filepath.Join(outputDir, "tiles_osgb_multi.glb")
 	start = time.Now()
 	err = ConvertToGlbMultiple(meshes, glbPath)
@@ -156,6 +227,15 @@ func TestTilesOsgbConvertWithOrigin(t *testing.T) {
 
 	outputDir := "./test_output"
 	os.MkdirAll(outputDir, 0755)
+
+	mstPath := filepath.Join(outputDir, "tiles_osgb_world.mst")
+	start = time.Now()
+	err = mst.MeshWriteTo(mstPath, mesh)
+	if err != nil {
+		t.Fatalf("MeshWriteTo failed: %v", err)
+	}
+	t.Logf("MST saved to %s, Duration: %v", mstPath, time.Since(start))
+
 	glbPath := filepath.Join(outputDir, "tiles_osgb_world.glb")
 	start = time.Now()
 	err = ConvertToGlb(mesh, glbPath)

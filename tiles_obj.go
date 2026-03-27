@@ -407,18 +407,10 @@ func (t *TilesObjToMst) processTriangle(mtg *mst.MeshTriangle, triangle []gobj.F
 	for i, corner := range triangle {
 		if corner.VertexIndex >= 0 && corner.VertexIndex < len(reader.V) {
 			v := reader.V[corner.VertexIndex]
-			if t.ApplyOrigin {
-				positions[i] = vec3.T{
-					float32(float64(v[0]) + t.origin[0]),
-					float32(float64(v[1]) + t.origin[1]),
-					float32(float64(v[2]) + t.origin[2]),
-				}
-			} else {
-				positions[i] = vec3.T{
-					float32(v[0]),
-					float32(v[1]),
-					float32(v[2]),
-				}
+			positions[i] = vec3.T{
+				float32(v[0]),
+				float32(v[1]),
+				float32(v[2]),
 			}
 		} else {
 			positions[i] = vec3.T{0, 0, 0}
