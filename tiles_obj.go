@@ -2,6 +2,7 @@ package asset3d
 
 import (
 	"encoding/xml"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -36,39 +37,54 @@ func (t *TilesObjToMst) ConvertMultiple(path string) ([]*mst.Mesh, *[6]float64, 
 	t.textureMap = make(map[string]*mst.Texture)
 	t.textureIdCounter = 0
 
-	metadataPath := filepath.Join(path, "metadata.xml")
-	if err := t.parseMetadata(metadataPath); err != nil {
-		return nil, nil, err
-	}
-
-	dataDir := filepath.Join(path, "Data")
-	if _, err := os.Stat(dataDir); os.IsNotExist(err) {
-		return nil, nil, err
-	}
-
-	var meshes []*mst.Mesh
-	ext := vec3d.MinBox
-
-	tileDirs, err := filepath.Glob(filepath.Join(dataDir, "Tile_*"))
+	info, err := os.Stat(path)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	for _, tileDir := range tileDirs {
-		objFiles, err := filepath.Glob(filepath.Join(tileDir, "*.obj"))
-		if err != nil {
-			continue
+	if !info.IsDir() {
+		if !strings.HasSuffix(strings.ToLower(path), ".obj") {
+			return nil, nil, fmt.Errorf("unsupported file format: %s", path)
 		}
+		var meshes []*mst.Mesh
+		ext := vec3d.MinBox
+		mesh := mst.NewMesh()
+		if err := t.processObjFile(path, mesh, &ext); err == nil && len(mesh.Nodes) > 0 {
+			meshes = append(meshes, mesh)
+		}
+		return meshes, ext.Array(), nil
+	}
+
+	metadataPath := filepath.Join(path, "metadata.xml")
+	t.parseMetadata(metadataPath)
+
+	var meshes []*mst.Mesh
+	ext := vec3d.MinBox
+
+	dataDir := filepath.Join(path, "Data")
+	if s, err := os.Stat(dataDir); err != nil || !s.IsDir() {
+		dataDir = path
+	}
+
+	tileDirs, _ := filepath.Glob(filepath.Join(dataDir, "Tile_*"))
+	if tileDirs == nil {
+		tileDirs, _ = filepath.Glob(filepath.Join(path, "Tile_*"))
+	}
+
+	for _, tileDir := range tileDirs {
+		objFiles, _ := filepath.Glob(filepath.Join(tileDir, "*.obj"))
 		if len(objFiles) == 0 {
 			continue
 		}
 
-		mesh := mst.NewMesh()
+		finest := findFinestLod(objFiles)
+		if finest == "" {
+			continue
+		}
 
-		for _, objFile := range objFiles {
-			if err := t.processObjFile(objFile, mesh, &ext); err != nil {
-				continue
-			}
+		mesh := mst.NewMesh()
+		if err := t.processObjFile(finest, mesh, &ext); err != nil {
+			continue
 		}
 
 		if len(mesh.Nodes) > 0 {

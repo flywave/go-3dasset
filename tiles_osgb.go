@@ -3,6 +3,7 @@ package asset3d
 import (
 	"encoding/xml"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,71 +13,110 @@ import (
 	"github.com/flywave/go-osg/model"
 	pj "github.com/flywave/go-proj"
 	vec3d "github.com/flywave/go3d/float64/vec3"
-
 	"github.com/flywave/go3d/vec2"
 	"github.com/flywave/go3d/vec3"
 )
 
+var _ FormatConvert = (*TilesOsgbToMst)(nil)
+
 type TilesOsgbToMst struct {
-	currentPath string
-	dataPath    string
-	origin      [3]float64
-	srs         string
-	loadedFiles map[string]bool
-	ApplyOrigin bool
-	GeoRef      *mst.GeoRef
+	currentPath   string
+	dataPath      string
+	origin        [3]float64
+	srs           string
+	loadedFiles   map[string]bool
+	ApplyOrigin   bool
+	GeoRef        *mst.GeoRef
+	GenerateNormals bool
 }
 
 func (t *TilesOsgbToMst) ConvertMultiple(path string) ([]*mst.Mesh, *[6]float64, error) {
 	t.currentPath = path
 	t.loadedFiles = make(map[string]bool)
 
-	metadataPath := filepath.Join(path, "metadata.xml")
-	if err := t.parseMetadata(metadataPath); err != nil {
+	info, err := os.Stat(path)
+	if err != nil {
 		return nil, nil, err
 	}
 
-	t.dataPath = filepath.Join(path, "Data")
-	if _, err := os.Stat(t.dataPath); os.IsNotExist(err) {
-		return nil, nil, err
+	// Single .osgb file → extract its finest geometry directly
+	if !info.IsDir() {
+		if !strings.HasSuffix(strings.ToLower(path), ".osgb") {
+			return nil, nil, fmt.Errorf("unsupported file format: %s", path)
+		}
+		var meshes []*mst.Mesh
+		ext := vec3d.MinBox
+		mesh := mst.NewMesh()
+		t.loadFile(path, mesh, &ext)
+		if len(mesh.Nodes) > 0 {
+			meshes = append(meshes, mesh)
+		}
+		return meshes, ext.Array(), nil
 	}
+
+	// Directory input
+	metadataPath := filepath.Join(path, "metadata.xml")
+	t.parseMetadata(metadataPath)
 
 	var meshes []*mst.Mesh
 	ext := vec3d.MinBox
 
-	mainFile := filepath.Join(t.dataPath, "main.osgb")
-	if _, err := os.Stat(mainFile); err == nil {
-		mesh := mst.NewMesh()
-		t.processOsgbFile(mainFile, mesh, &ext)
-		if len(mesh.Nodes) > 0 {
-			geoRef := t.computeGeoRef()
-			if geoRef != nil {
-				mesh.GeoRef = geoRef
+	// Strategy 1: Data/Tile_+xxx_+xxx/ structure (ContextCapture standard)
+	dataDir := filepath.Join(path, "Data")
+	if s, err := os.Stat(dataDir); err == nil && s.IsDir() {
+		tileDirs, _ := filepath.Glob(filepath.Join(dataDir, "Tile_*"))
+		for _, tileDir := range tileDirs {
+			osgbFiles, _ := filepath.Glob(filepath.Join(tileDir, "*.osgb"))
+			if len(osgbFiles) == 0 {
+				continue
 			}
-			meshes = append(meshes, mesh)
+			finest := findFinestLod(osgbFiles)
+			if finest == "" {
+				continue
+			}
+			mesh := mst.NewMesh()
+			t.loadFile(finest, mesh, &ext)
+			if len(mesh.Nodes) > 0 {
+				if geoRef := t.computeGeoRef(); geoRef != nil {
+					mesh.GeoRef = geoRef
+				}
+				meshes = append(meshes, mesh)
+			}
+		}
+		if len(meshes) > 0 {
+			return meshes, ext.Array(), nil
 		}
 	}
 
-	tileDirs, err := filepath.Glob(filepath.Join(t.dataPath, "Tile_*"))
-	if err == nil {
-		for _, tileDir := range tileDirs {
-			osgbFiles, err := filepath.Glob(filepath.Join(tileDir, "*.osgb"))
-			if err != nil {
+	// Strategy 2: OSGB files directly in root directory
+	osgbFiles, _ := filepath.Glob(filepath.Join(path, "*.osgb"))
+	if len(osgbFiles) > 0 {
+		// Group by region (files without _L are coarser versions of same region)
+		groups := make(map[string][]string)
+		for _, f := range osgbFiles {
+			base := filepath.Base(f)
+			// Strip _L<level> suffix to group by region
+			region := stripLODSuffix(base)
+			groups[region] = append(groups[region], f)
+		}
+		for _, files := range groups {
+			if len(files) == 0 {
 				continue
 			}
-			finestFile := t.findFinestLod(osgbFiles)
-			if finestFile != "" {
-				mesh := mst.NewMesh()
-				t.processOsgbFile(finestFile, mesh, &ext)
-				if len(mesh.Nodes) > 0 {
-					geoRef := t.computeGeoRef()
-					if geoRef != nil {
-						mesh.GeoRef = geoRef
-					}
-					meshes = append(meshes, mesh)
+			finest := findFinestLod(files)
+			if finest == "" {
+				continue
+			}
+			mesh := mst.NewMesh()
+			t.loadFile(finest, mesh, &ext)
+			if len(mesh.Nodes) > 0 {
+				if geoRef := t.computeGeoRef(); geoRef != nil {
+					mesh.GeoRef = geoRef
 				}
+				meshes = append(meshes, mesh)
 			}
 		}
+		return meshes, ext.Array(), nil
 	}
 
 	return meshes, ext.Array(), nil
@@ -93,63 +133,65 @@ func (t *TilesOsgbToMst) Convert(path string) (*mst.Mesh, *[6]float64, error) {
 	return meshes[0], ext, nil
 }
 
-func (t *TilesOsgbToMst) findFinestLod(files []string) string {
+// --- file discovery ---
+
+func findFinestLod(files []string) string {
 	if len(files) == 0 {
 		return ""
 	}
-	if len(files) == 1 {
-		return files[0]
-	}
-
-	maxLod := -1
-	var finestFile string
-
-	for _, f := range files {
-		base := filepath.Base(f)
-		lod := t.extractLodLevel(base)
-		if lod > maxLod {
-			maxLod = lod
-			finestFile = f
+	best := files[0]
+	bestLod := extractLodLevel(filepath.Base(best))
+	for _, f := range files[1:] {
+		if l := extractLodLevel(filepath.Base(f)); l > bestLod {
+			bestLod = l
+			best = f
 		}
 	}
-
-	return finestFile
+	return best
 }
 
-func (t *TilesOsgbToMst) extractLodLevel(filename string) int {
+func extractLodLevel(filename string) int {
 	lod := 0
 	for i := 0; i < len(filename); i++ {
 		if filename[i] == 'L' && i+1 < len(filename) {
-			j := i + 1
-			for j < len(filename) && filename[j] >= '0' && filename[j] <= '9' {
+			for j := i + 1; j < len(filename) && filename[j] >= '0' && filename[j] <= '9'; j++ {
 				lod = lod*10 + int(filename[j]-'0')
-				j++
 			}
 			return lod
 		}
 	}
-	return lod
+	return 0
 }
+
+func stripLODSuffix(filename string) string {
+	for i := 0; i < len(filename); i++ {
+		if filename[i] == 'L' && i+1 < len(filename) && filename[i+1] >= '0' && filename[i+1] <= '9' {
+			// Check _L pattern
+			if i > 0 && filename[i-1] == '_' {
+				return filename[:i-1] + ".osgb"
+			}
+		}
+	}
+	return filename
+}
+
+// --- metadata ---
 
 func (t *TilesOsgbToMst) parseMetadata(path string) error {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return err
 	}
-
-	var metadata ModelMetadata
-	if err := xml.Unmarshal(data, &metadata); err != nil {
+	var meta ModelMetadata
+	if err := xml.Unmarshal(data, &meta); err != nil {
 		return err
 	}
-
-	t.srs = metadata.SRS
-	parts := strings.Split(metadata.SRSOrigin, ",")
-	if len(parts) >= 3 {
+	t.srs = meta.SRS
+	if parts := strings.Split(meta.SRSOrigin, ","); len(parts) >= 3 {
 		t.origin[0] = parseFloat(parts[0])
 		t.origin[1] = parseFloat(parts[1])
 		t.origin[2] = parseFloat(parts[2])
 	}
-
 	return nil
 }
 
@@ -157,11 +199,9 @@ func (t *TilesOsgbToMst) computeGeoRef() *mst.GeoRef {
 	if t.GeoRef != nil {
 		return t.GeoRef
 	}
-
 	if t.srs == "" || t.srs == "unknown" {
 		return nil
 	}
-
 	proj, err := pj.NewProj(t.srs)
 	if err != nil {
 		return nil
@@ -178,21 +218,19 @@ func (t *TilesOsgbToMst) computeGeoRef() *mst.GeoRef {
 	if err != nil {
 		return nil
 	}
-
-	alt := t.origin[2]
-
-	ecefX, ecefY, ecefZ, err := pj.Lonlat2Ecef(lon, lat, alt)
+	ecefX, ecefY, ecefZ, err := pj.Lonlat2Ecef(lon, lat, t.origin[2])
 	if err != nil {
 		return nil
 	}
-
 	return &mst.GeoRef{
 		EcefOrigin:   [3]float64{ecefX, ecefY, ecefZ},
-		LatLonOrigin: [3]float64{lat, lon, alt},
+		LatLonOrigin: [3]float64{lat, lon, t.origin[2]},
 	}
 }
 
-func (t *TilesOsgbToMst) processOsgbFile(osgbPath string, mesh *mst.Mesh, ext *vec3d.Box) error {
+// --- loading ---
+
+func (t *TilesOsgbToMst) loadFile(osgbPath string, mesh *mst.Mesh, ext *vec3d.Box) {
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Printf("[ERROR] Recovered from panic: %v\n", r)
@@ -201,535 +239,365 @@ func (t *TilesOsgbToMst) processOsgbFile(osgbPath string, mesh *mst.Mesh, ext *v
 
 	absPath, _ := filepath.Abs(osgbPath)
 	if t.loadedFiles[absPath] {
-		return nil
+		return
 	}
 	t.loadedFiles[absPath] = true
 
 	rw := osg.NewReadWrite()
-	result := rw.ReadNode(osgbPath, nil)
-	if result == nil || result.GetNode() == nil {
-		return nil
+	res := rw.ReadNode(osgbPath, nil)
+	if res == nil || res.GetNode() == nil {
+		return
+	}
+	t.traverse(res.GetNode(), mesh, ext, filepath.Dir(osgbPath), nil)
+}
+
+func (t *TilesOsgbToMst) traverse(n interface{}, mesh *mst.Mesh, ext *vec3d.Box, baseDir string, matrix *[4][4]float32) {
+	switch v := n.(type) {
+	case *model.Geode:
+		for _, c := range v.GetChildren() {
+			if g, ok := c.(*model.Geometry); ok {
+				t.processGeometry(g, mesh, ext, matrix)
+			}
+		}
+
+	case *model.Group:
+		for _, c := range v.GetChildren() {
+			t.traverse(c, mesh, ext, baseDir, matrix)
+		}
+
+	case *model.MatrixTransform:
+		combined := combineMatrix(matrix, &v.Matrix)
+		for _, c := range v.GetChildren() {
+			t.traverse(c, mesh, ext, baseDir, combined)
+		}
+
+	case *model.PositionAttitudeTransform:
+		combined := combineMatrix(matrix, patToMatrix(v.Position, v.Attitude, v.Scale))
+		for _, c := range v.GetChildren() {
+			t.traverse(c, mesh, ext, baseDir, combined)
+		}
+
+	case *model.PagedLod:
+		// Only process inline geometry (finest LOD level).
+		// PagedLod file references point to lower-LOD child tiles;
+		// skip them to extract only the highest-detail geometry.
+		for _, c := range v.GetChildren() {
+			t.traverse(c, mesh, ext, baseDir, matrix)
+		}
+	}
+}
+
+// --- geometry processing ---
+
+func (t *TilesOsgbToMst) processGeometry(g *model.Geometry, mesh *mst.Mesh, ext *vec3d.Box, matrix *[4][4]float32) {
+	if g.VertexArray == nil || g.VertexArray.Data == nil {
+		return
+	}
+	positions := extractVec3s(g.VertexArray, t.ApplyOrigin, t.origin)
+	if len(positions) == 0 {
+		return
+	}
+	if matrix != nil {
+		positions = applyMatrix(positions, matrix)
 	}
 
-	node := result.GetNode()
-	t.traverseNode(node, mesh, ext, filepath.Dir(osgbPath))
+	var uvs []vec2.T
+	if len(g.TexCoordArrayList) > 0 && g.TexCoordArrayList[0] != nil && g.TexCoordArrayList[0].Data != nil {
+		uvs = extractVec2s(g.TexCoordArrayList[0])
+	}
+	hasUV := len(uvs) > 0
 
+	meshNode := &mst.MeshNode{}
+	faceGroup := &mst.MeshTriangle{Batchid: int32(len(mesh.Materials))}
+
+	for _, prim := range g.Primitives {
+		t.processPrim(prim, positions, uvs, hasUV, meshNode, faceGroup, ext)
+	}
+
+	if len(faceGroup.Faces) == 0 {
+		return
+	}
+
+	if t.GenerateNormals && len(meshNode.Vertices) > 0 && len(meshNode.Normals) == 0 {
+		meshNode.Normals = computeNormals(meshNode.Vertices, faceGroup.Faces)
+	}
+	if len(meshNode.Normals) == 0 && len(meshNode.Vertices) > 0 {
+		for range meshNode.Vertices {
+			meshNode.Normals = append(meshNode.Normals, vec3.T{0, 0, 1})
+		}
+	}
+
+	meshNode.FaceGroup = append(meshNode.FaceGroup, faceGroup)
+	mesh.Nodes = append(mesh.Nodes, meshNode)
+	mesh.Materials = append(mesh.Materials, &mst.BaseMaterial{Color: [3]byte{200, 200, 200}})
+}
+
+func (t *TilesOsgbToMst) processPrim(prim interface{}, positions []vec3.T, uvs []vec2.T, hasUV bool, node *mst.MeshNode, fg *mst.MeshTriangle, ext *vec3d.Box) {
+	switch p := prim.(type) {
+	case *model.DrawElementsUInt:
+		if p.Data == nil {
+			return
+		}
+		for i := 0; i+2 < len(p.Data); i += 3 {
+			t.emitTriangle(int(p.Data[i]), int(p.Data[i+1]), int(p.Data[i+2]), positions, uvs, hasUV, node, fg, ext)
+		}
+	case *model.DrawElementsUShort:
+		if p.Data == nil {
+			return
+		}
+		for i := 0; i+2 < len(p.Data); i += 3 {
+			t.emitTriangle(int(p.Data[i]), int(p.Data[i+1]), int(p.Data[i+2]), positions, uvs, hasUV, node, fg, ext)
+		}
+	case *model.DrawElementsUByte:
+		if p.Data == nil {
+			return
+		}
+		for i := 0; i+2 < len(p.Data); i += 3 {
+			t.emitTriangle(int(p.Data[i]), int(p.Data[i+1]), int(p.Data[i+2]), positions, uvs, hasUV, node, fg, ext)
+		}
+	case *model.DrawArrays:
+		if p.Count < 3 {
+			return
+		}
+		for i := int(p.First); i+2 < int(p.First)+int(p.Count); i += 3 {
+			t.emitTriangle(i, i+1, i+2, positions, uvs, hasUV, node, fg, ext)
+		}
+	}
+}
+
+func (t *TilesOsgbToMst) emitTriangle(i0, i1, i2 int, positions []vec3.T, uvs []vec2.T, hasUV bool, node *mst.MeshNode, fg *mst.MeshTriangle, ext *vec3d.Box) {
+	if i0 >= len(positions) || i1 >= len(positions) || i2 >= len(positions) {
+		return
+	}
+	base := uint32(len(node.Vertices))
+	for _, vi := range []int{i0, i1, i2} {
+		v := positions[vi]
+		node.Vertices = append(node.Vertices, v)
+		ext.Extend(&vec3d.T{float64(v[0]), float64(v[1]), float64(v[2])})
+		if hasUV && vi < len(uvs) {
+			node.TexCoords = append(node.TexCoords, uvs[vi])
+		} else {
+			node.TexCoords = append(node.TexCoords, vec2.T{0, 0})
+		}
+	}
+	fg.Faces = append(fg.Faces, &mst.Face{Vertex: [3]uint32{base, base + 1, base + 2}})
+}
+
+// --- vertex extraction ---
+
+func extractVec3s(arr *model.Array, applyOrigin bool, origin [3]float64) []vec3.T {
+	if arr == nil || arr.Data == nil {
+		return nil
+	}
+	switch data := arr.Data.(type) {
+	case [][3]float32:
+		out := make([]vec3.T, len(data))
+		for i, v := range data {
+			if applyOrigin {
+				out[i] = vec3.T{v[0] + float32(origin[0]), v[1] + float32(origin[1]), v[2] + float32(origin[2])}
+			} else {
+				out[i] = vec3.T{v[0], v[1], v[2]}
+			}
+		}
+		return out
+	case []float32:
+		n := len(data) / 3
+		out := make([]vec3.T, n)
+		for i := 0; i < n; i++ {
+			if applyOrigin {
+				out[i] = vec3.T{data[i*3] + float32(origin[0]), data[i*3+1] + float32(origin[1]), data[i*3+2] + float32(origin[2])}
+			} else {
+				out[i] = vec3.T{data[i*3], data[i*3+1], data[i*3+2]}
+			}
+		}
+		return out
+	case []int16:
+		n := len(data) / 3
+		out := make([]vec3.T, n)
+		for i := 0; i < n; i++ {
+			x, y, z := float64(data[i*3])/1000, float64(data[i*3+1])/1000, float64(data[i*3+2])/1000
+			if applyOrigin {
+				x += origin[0]; y += origin[1]; z += origin[2]
+			}
+			out[i] = vec3.T{float32(x), float32(y), float32(z)}
+		}
+		return out
+	case []uint16:
+		n := len(data) / 3
+		out := make([]vec3.T, n)
+		for i := 0; i < n; i++ {
+			x, y, z := float64(data[i*3])/1000, float64(data[i*3+1])/1000, float64(data[i*3+2])/1000
+			if applyOrigin {
+				x += origin[0]; y += origin[1]; z += origin[2]
+			}
+			out[i] = vec3.T{float32(x), float32(y), float32(z)}
+		}
+		return out
+	case []int32:
+		n := len(data) / 3
+		out := make([]vec3.T, n)
+		for i := 0; i < n; i++ {
+			x, y, z := float64(data[i*3])/1000, float64(data[i*3+1])/1000, float64(data[i*3+2])/1000
+			if applyOrigin {
+				x += origin[0]; y += origin[1]; z += origin[2]
+			}
+			out[i] = vec3.T{float32(x), float32(y), float32(z)}
+		}
+		return out
+	}
 	return nil
 }
 
-func (t *TilesOsgbToMst) traverseNode(node model.NodeInterface, mesh *mst.Mesh, ext *vec3d.Box, baseDir string) {
-	t.traverseNodeWithMatrix(node, mesh, ext, baseDir, nil)
-}
-
-func (t *TilesOsgbToMst) traverseNodeWithMatrix(node model.NodeInterface, mesh *mst.Mesh, ext *vec3d.Box, baseDir string, parentMatrix *[4][4]float32) {
-	switch n := node.(type) {
-	case *model.Group:
-		for _, child := range n.Children {
-			t.traverseNodeWithMatrix(child, mesh, ext, baseDir, parentMatrix)
-		}
-	case *model.MatrixTransform:
-		combinedMatrix := t.combineMatrix(parentMatrix, &n.Matrix)
-		for _, child := range n.Children {
-			t.traverseNodeWithMatrix(child, mesh, ext, baseDir, combinedMatrix)
-		}
-	case *model.PositionAttitudeTransform:
-		matrix := t.positionAttitudeToMatrix(n.Position, n.Attitude, n.Scale)
-		combinedMatrix := t.combineMatrix(parentMatrix, matrix)
-		for _, child := range n.Children {
-			t.traverseNodeWithMatrix(child, mesh, ext, baseDir, combinedMatrix)
-		}
-	case *model.PagedLod:
-		for _, child := range n.Children {
-			t.traverseNodeWithMatrix(child, mesh, ext, baseDir, parentMatrix)
-		}
-		for _, perData := range n.PerRangeDataList {
-			if perData.FileName != "" {
-				childPath := perData.FileName
-				childPath = strings.ReplaceAll(childPath, "\\", "/")
-				if !filepath.IsAbs(childPath) {
-					childPath = filepath.Join(baseDir, childPath)
-				}
-				absPath, _ := filepath.Abs(childPath)
-				if _, err := os.Stat(childPath); err == nil {
-					if !t.loadedFiles[absPath] {
-						t.loadedFiles[absPath] = true
-						t.processOsgbFile(childPath, mesh, ext)
-					}
-				}
-			}
-		}
-		for _, perData := range n.PerRangeDataList {
-			if perData.FileName != "" {
-				childPath := perData.FileName
-				childPath = strings.ReplaceAll(childPath, "\\", "/")
-				if !filepath.IsAbs(childPath) {
-					childPath = filepath.Join(baseDir, childPath)
-				}
-				absPath, _ := filepath.Abs(childPath)
-				if fi, err := os.Stat(childPath); err == nil {
-					fmt.Printf("[DEBUG] File exists: %s, size: %d\n", childPath, fi.Size())
-					if !t.loadedFiles[absPath] {
-						t.loadedFiles[absPath] = true
-						fmt.Printf("[DEBUG] Loading tile file: %s\n", childPath)
-						t.processOsgbFile(childPath, mesh, ext)
-						fmt.Printf("[DEBUG] Finished loading: %s\n", childPath)
-					}
-				}
-			}
-		}
-		for _, perData := range n.PerRangeDataList {
-			if perData.FileName != "" {
-				childPath := perData.FileName
-				childPath = strings.ReplaceAll(childPath, "\\", "/")
-				if !filepath.IsAbs(childPath) {
-					childPath = filepath.Join(baseDir, childPath)
-				}
-				absPath, _ := filepath.Abs(childPath)
-				if fi, err := os.Stat(childPath); err == nil {
-					fmt.Printf("[DEBUG] File exists: %s, size: %d\n", childPath, fi.Size())
-					if !t.loadedFiles[absPath] {
-						t.loadedFiles[absPath] = true
-						t.processOsgbFile(childPath, mesh, ext)
-					}
-				} else {
-					fmt.Printf("[DEBUG] File not found: %s, error: %v\n", childPath, err)
-				}
-			}
-		}
-	case *model.Geode:
-		for _, child := range n.Children {
-			if geom, ok := child.(*model.Geometry); ok {
-				t.processGeometryWithMatrix(geom, mesh, ext, parentMatrix)
-			}
-		}
-	case *model.Geometry:
-		t.processGeometryWithMatrix(n, mesh, ext, parentMatrix)
+func extractVec2s(arr *model.Array) []vec2.T {
+	if arr == nil || arr.Data == nil {
+		return nil
 	}
+	switch data := arr.Data.(type) {
+	case [][2]float32:
+		out := make([]vec2.T, len(data))
+		for i, v := range data {
+			out[i] = vec2.T{v[0], v[1]}
+		}
+		return out
+	case []float32:
+		n := len(data) / 2
+		out := make([]vec2.T, n)
+		for i := 0; i < n; i++ {
+			out[i] = vec2.T{data[i*2], data[i*2+1]}
+		}
+		return out
+	case []int16:
+		n := len(data) / 2
+		out := make([]vec2.T, n)
+		for i := 0; i < n; i++ {
+			out[i] = vec2.T{float32(data[i*2]), float32(data[i*2+1])}
+		}
+		return out
+	case []int32:
+		n := len(data) / 2
+		out := make([]vec2.T, n)
+		for i := 0; i < n; i++ {
+			out[i] = vec2.T{float32(data[i*2]), float32(data[i*2+1])}
+		}
+		return out
+	}
+	return nil
 }
 
-func (t *TilesOsgbToMst) combineMatrix(parent, child *[4][4]float32) *[4][4]float32 {
+// --- matrix helpers ---
+
+func combineMatrix(parent, child *[4][4]float32) *[4][4]float32 {
 	if parent == nil {
 		return child
 	}
 	if child == nil {
 		return parent
 	}
-	result := new([4][4]float32)
+	var r [4][4]float32
 	for i := 0; i < 4; i++ {
 		for j := 0; j < 4; j++ {
-			result[i][j] = 0
 			for k := 0; k < 4; k++ {
-				result[i][j] += parent[i][k] * child[k][j]
+				r[i][j] += parent[i][k] * child[k][j]
 			}
 		}
 	}
-	return result
+	return &r
 }
 
-func (t *TilesOsgbToMst) positionAttitudeToMatrix(position [3]float64, attitude [4]float64, scale [3]float64) *[4][4]float32 {
-	result := new([4][4]float32)
-
+func patToMatrix(pos [3]float64, att [4]float64, scl [3]float64) *[4][4]float32 {
+	var r [4][4]float32
 	for i := 0; i < 4; i++ {
-		for j := 0; j < 4; j++ {
-			if i == j {
-				result[i][j] = 1
-			} else {
-				result[i][j] = 0
-			}
-		}
+		r[i][i] = 1
 	}
-
-	if scale[0] == 0 || scale[1] == 0 || scale[2] == 0 ||
-		scale[0] > 1e100 || scale[1] > 1e100 || scale[2] > 1e100 {
-		scale = [3]float64{1, 1, 1}
+	if scl[0] == 0 || scl[1] == 0 || scl[2] == 0 || scl[0] > 1e100 {
+		scl = [3]float64{1, 1, 1}
 	}
-
-	x, y, z, w := attitude[0], attitude[1], attitude[2], attitude[3]
+	x, y, z, w := att[0], att[1], att[2], att[3]
 	xx, yy, zz := x*x, y*y, z*z
 	xy, xz, yz := x*y, x*z, y*z
 	wx, wy, wz := w*x, w*y, w*z
 
-	result[0][0] = float32(1 - 2*(yy+zz))
-	result[0][1] = float32(2 * (xy + wz))
-	result[0][2] = float32(2 * (xz - wy))
+	r[0][0] = float32(1 - 2*(yy+zz))
+	r[0][1] = float32(2 * (xy + wz))
+	r[0][2] = float32(2 * (xz - wy))
+	r[1][0] = float32(2 * (xy - wz))
+	r[1][1] = float32(1 - 2*(xx+zz))
+	r[1][2] = float32(2 * (yz + wx))
+	r[2][0] = float32(2 * (xz + wy))
+	r[2][1] = float32(2 * (yz - wx))
+	r[2][2] = float32(1 - 2*(xx+yy))
 
-	result[1][0] = float32(2 * (xy - wz))
-	result[1][1] = float32(1 - 2*(xx+zz))
-	result[1][2] = float32(2 * (yz + wx))
+	r[0][0] *= float32(scl[0])
+	r[0][1] *= float32(scl[0])
+	r[0][2] *= float32(scl[0])
+	r[1][0] *= float32(scl[1])
+	r[1][1] *= float32(scl[1])
+	r[1][2] *= float32(scl[1])
+	r[2][0] *= float32(scl[2])
+	r[2][1] *= float32(scl[2])
+	r[2][2] *= float32(scl[2])
 
-	result[2][0] = float32(2 * (xz + wy))
-	result[2][1] = float32(2 * (yz - wx))
-	result[2][2] = float32(1 - 2*(xx+yy))
-
-	result[0][0] *= float32(scale[0])
-	result[0][1] *= float32(scale[0])
-	result[0][2] *= float32(scale[0])
-	result[1][0] *= float32(scale[1])
-	result[1][1] *= float32(scale[1])
-	result[1][2] *= float32(scale[1])
-	result[2][0] *= float32(scale[2])
-	result[2][1] *= float32(scale[2])
-	result[2][2] *= float32(scale[2])
-
-	result[3][0] = float32(position[0])
-	result[3][1] = float32(position[1])
-	result[3][2] = float32(position[2])
-
-	return result
+	r[3][0] = float32(pos[0])
+	r[3][1] = float32(pos[1])
+	r[3][2] = float32(pos[2])
+	return &r
 }
 
-func (t *TilesOsgbToMst) processGeometry(geom *model.Geometry, mesh *mst.Mesh, ext *vec3d.Box) {
-	if geom.VertexArray == nil || geom.VertexArray.Data == nil {
-		return
-	}
-
-	vertices := t.extractVec3Array(geom.VertexArray)
-	if len(vertices) == 0 {
-		return
-	}
-
-	var texCoords []vec2.T
-	if len(geom.TexCoordArrayList) > 0 && geom.TexCoordArrayList[0] != nil && geom.TexCoordArrayList[0].Data != nil {
-		texCoords = t.extractVec2Array(geom.TexCoordArrayList[0])
-	}
-
-	meshNode := &mst.MeshNode{}
-	faceGroup := &mst.MeshTriangle{Batchid: int32(len(mesh.Materials))}
-
-	for _, prim := range geom.Primitives {
-		t.processPrimitive(prim, vertices, texCoords, meshNode, faceGroup, ext)
-	}
-
-	if len(faceGroup.Faces) > 0 {
-		meshNode.FaceGroup = append(meshNode.FaceGroup, faceGroup)
-		mesh.Nodes = append(mesh.Nodes, meshNode)
-		mesh.Materials = append(mesh.Materials, &mst.BaseMaterial{Color: [3]byte{200, 200, 200}})
-	}
-}
-
-func (t *TilesOsgbToMst) processGeometryWithMatrix(geom *model.Geometry, mesh *mst.Mesh, ext *vec3d.Box, matrix *[4][4]float32) {
-	if geom.VertexArray == nil || geom.VertexArray.Data == nil {
-		fmt.Printf("[DEBUG] processGeometry: no vertex array\n")
-		return
-	}
-
-	vertices := t.extractVec3Array(geom.VertexArray)
-	if len(vertices) == 0 {
-		fmt.Printf("[DEBUG] processGeometry: no vertices extracted\n")
-		return
-	}
-
-	fmt.Printf("[DEBUG] processGeometry: %d vertices\n", len(vertices))
-	if len(vertices) > 0 {
-		fmt.Printf("[DEBUG] First vertex: %v\n", vertices[0])
-	}
-
-	if matrix != nil {
-		vertices = t.applyMatrixToVertices(vertices, matrix)
-	}
-
-	var texCoords []vec2.T
-	if len(geom.TexCoordArrayList) > 0 && geom.TexCoordArrayList[0] != nil && geom.TexCoordArrayList[0].Data != nil {
-		texCoords = t.extractVec2Array(geom.TexCoordArrayList[0])
-	}
-
-	meshNode := &mst.MeshNode{}
-	faceGroup := &mst.MeshTriangle{Batchid: int32(len(mesh.Materials))}
-
-	for _, prim := range geom.Primitives {
-		t.processPrimitive(prim, vertices, texCoords, meshNode, faceGroup, ext)
-	}
-
-	if len(faceGroup.Faces) > 0 {
-		meshNode.FaceGroup = append(meshNode.FaceGroup, faceGroup)
-		mesh.Nodes = append(mesh.Nodes, meshNode)
-		mesh.Materials = append(mesh.Materials, &mst.BaseMaterial{Color: [3]byte{200, 200, 200}})
-	}
-}
-
-func (t *TilesOsgbToMst) applyMatrixToVertices(vertices []vec3.T, matrix *[4][4]float32) []vec3.T {
-	result := make([]vec3.T, len(vertices))
-	for i, v := range vertices {
-		x := float64(v[0])
-		y := float64(v[1])
-		z := float64(v[2])
-		w := float64(matrix[3][0])*x + float64(matrix[3][1])*y + float64(matrix[3][2])*z + float64(matrix[3][3])
-		result[i] = vec3.T{
-			float32(float64(matrix[0][0])*x + float64(matrix[1][0])*y + float64(matrix[2][0])*z + float64(matrix[3][0])),
-			float32(float64(matrix[0][1])*x + float64(matrix[1][1])*y + float64(matrix[2][1])*z + float64(matrix[3][1])),
-			float32(float64(matrix[0][2])*x + float64(matrix[1][2])*y + float64(matrix[2][2])*z + float64(matrix[3][2])),
+func applyMatrix(vs []vec3.T, m *[4][4]float32) []vec3.T {
+	out := make([]vec3.T, len(vs))
+	for i, v := range vs {
+		x, y, z := float64(v[0]), float64(v[1]), float64(v[2])
+		out[i] = vec3.T{
+			float32(float64(m[0][0])*x + float64(m[1][0])*y + float64(m[2][0])*z + float64(m[3][0])),
+			float32(float64(m[0][1])*x + float64(m[1][1])*y + float64(m[2][1])*z + float64(m[3][1])),
+			float32(float64(m[0][2])*x + float64(m[1][2])*y + float64(m[2][2])*z + float64(m[3][2])),
 		}
+		w := float64(m[3][0])*x + float64(m[3][1])*y + float64(m[3][2])*z + float64(m[3][3])
 		if w != 0 && w != 1 {
-			result[i][0] /= float32(w)
-			result[i][1] /= float32(w)
-			result[i][2] /= float32(w)
+			out[i][0] /= float32(w)
+			out[i][1] /= float32(w)
+			out[i][2] /= float32(w)
 		}
 	}
-	return result
+	return out
 }
 
-func (t *TilesOsgbToMst) extractVec3Array(arr *model.Array) []vec3.T {
-	if arr == nil || arr.Data == nil {
-		return nil
-	}
+// --- normal generation ---
 
-	switch data := arr.Data.(type) {
-	case []float32:
-		count := len(data) / 3
-		if count <= 0 {
-			return nil
-		}
-		result := make([]vec3.T, count)
-		for i := 0; i < count; i++ {
-			if t.ApplyOrigin {
-				result[i] = vec3.T{
-					float32(float64(data[i*3]) + t.origin[0]),
-					float32(float64(data[i*3+1]) + t.origin[1]),
-					float32(float64(data[i*3+2]) + t.origin[2]),
-				}
-			} else {
-				result[i] = vec3.T{
-					data[i*3],
-					data[i*3+1],
-					data[i*3+2],
-				}
-			}
-		}
-		return result
-	case []int16:
-		count := len(data) / 3
-		if count <= 0 {
-			return nil
-		}
-		result := make([]vec3.T, count)
-		for i := 0; i < count; i++ {
-			x := float64(data[i*3]) / 1000.0
-			y := float64(data[i*3+1]) / 1000.0
-			z := float64(data[i*3+2]) / 1000.0
-			if t.ApplyOrigin {
-				x += t.origin[0]
-				y += t.origin[1]
-				z += t.origin[2]
-			}
-			result[i] = vec3.T{float32(x), float32(y), float32(z)}
-		}
-		return result
-	case []int32:
-		count := len(data) / 3
-		if count <= 0 {
-			return nil
-		}
-		result := make([]vec3.T, count)
-		for i := 0; i < count; i++ {
-			x := float64(data[i*3]) / 1000.0
-			y := float64(data[i*3+1]) / 1000.0
-			z := float64(data[i*3+2]) / 1000.0
-			if t.ApplyOrigin {
-				x += t.origin[0]
-				y += t.origin[1]
-				z += t.origin[2]
-			}
-			result[i] = vec3.T{float32(x), float32(y), float32(z)}
-		}
-		return result
-	case []uint16:
-		count := len(data) / 3
-		if count <= 0 {
-			return nil
-		}
-		result := make([]vec3.T, count)
-		for i := 0; i < count; i++ {
-			x := float64(data[i*3]) / 1000.0
-			y := float64(data[i*3+1]) / 1000.0
-			z := float64(data[i*3+2]) / 1000.0
-			if t.ApplyOrigin {
-				x += t.origin[0]
-				y += t.origin[1]
-				z += t.origin[2]
-			}
-			result[i] = vec3.T{float32(x), float32(y), float32(z)}
-		}
-		return result
-	case []vec3.T:
-		count := len(data)
-		if count <= 0 {
-			return nil
-		}
-		result := make([]vec3.T, count)
-		for i, v := range data {
-			if t.ApplyOrigin {
-				result[i] = vec3.T{
-					float32(float64(v[0]) + t.origin[0]),
-					float32(float64(v[1]) + t.origin[1]),
-					float32(float64(v[2]) + t.origin[2]),
-				}
-			} else {
-				result[i] = v
-			}
-		}
-		return result
-	}
-	return nil
-}
-
-func (t *TilesOsgbToMst) extractVec2Array(arr *model.Array) []vec2.T {
-	if arr == nil || arr.Data == nil {
-		return nil
-	}
-
-	switch data := arr.Data.(type) {
-	case []float32:
-		count := len(data) / 2
-		if count <= 0 {
-			return nil
-		}
-		result := make([]vec2.T, count)
-		for i := 0; i < count; i++ {
-			result[i] = vec2.T{data[i*2], data[i*2+1]}
-		}
-		return result
-	case []int16:
-		count := len(data) / 2
-		if count <= 0 {
-			return nil
-		}
-		result := make([]vec2.T, count)
-		for i := 0; i < count; i++ {
-			result[i] = vec2.T{float32(data[i*2]), float32(data[i*2+1])}
-		}
-		return result
-	case []int32:
-		count := len(data) / 2
-		if count <= 0 {
-			return nil
-		}
-		result := make([]vec2.T, count)
-		for i := 0; i < count; i++ {
-			result[i] = vec2.T{float32(data[i*2]), float32(data[i*2+1])}
-		}
-		return result
-	case []vec2.T:
-		count := len(data)
-		if count <= 0 {
-			return nil
-		}
-		return data
-	}
-	return nil
-}
-
-func (t *TilesOsgbToMst) processPrimitive(prim interface{}, vertices []vec3.T, texCoords []vec2.T, meshNode *mst.MeshNode, faceGroup *mst.MeshTriangle, ext *vec3d.Box) {
-	if prim == nil {
-		return
-	}
-	switch p := prim.(type) {
-	case *model.DrawElementsUShort:
-		if p.Data != nil {
-			t.processDrawElementsUShort(p.Data, vertices, texCoords, meshNode, faceGroup, ext)
-		}
-	case *model.DrawElementsUInt:
-		if p.Data != nil {
-			t.processDrawElementsUInt(p.Data, vertices, texCoords, meshNode, faceGroup, ext)
-		}
-	case *model.DrawArrays:
-		t.processDrawArrays(p.First, p.Count, vertices, texCoords, meshNode, faceGroup, ext)
-	}
-}
-
-func (t *TilesOsgbToMst) processDrawElementsUShort(indices []uint16, vertices []vec3.T, texCoords []vec2.T, meshNode *mst.MeshNode, faceGroup *mst.MeshTriangle, ext *vec3d.Box) {
-	for i := 0; i+2 < len(indices); i += 3 {
-		v0 := int(indices[i])
-		v1 := int(indices[i+1])
-		v2 := int(indices[i+2])
-
-		if v0 >= len(vertices) || v1 >= len(vertices) || v2 >= len(vertices) {
+func computeNormals(verts []vec3.T, faces []*mst.Face) []vec3.T {
+	n := make([]vec3.T, len(verts))
+	for _, f := range faces {
+		i0, i1, i2 := int(f.Vertex[0]), int(f.Vertex[1]), int(f.Vertex[2])
+		if i0 >= len(verts) || i1 >= len(verts) || i2 >= len(verts) {
 			continue
 		}
-
-		baseIndex := uint32(len(meshNode.Vertices))
-
-		for _, vi := range []int{v0, v1, v2} {
-			v := vertices[vi]
-			meshNode.Vertices = append(meshNode.Vertices, v)
-			ext.Extend(&vec3d.T{float64(v[0]), float64(v[1]), float64(v[2])})
-
-			if texCoords != nil && vi < len(texCoords) {
-				meshNode.TexCoords = append(meshNode.TexCoords, texCoords[vi])
-			} else {
-				meshNode.TexCoords = append(meshNode.TexCoords, vec2.T{0, 0})
-			}
-
-			meshNode.Normals = append(meshNode.Normals, vec3.T{0, 0, 1})
-		}
-
-		faceGroup.Faces = append(faceGroup.Faces, &mst.Face{
-			Vertex: [3]uint32{baseIndex, baseIndex + 1, baseIndex + 2},
-		})
-	}
-}
-
-func (t *TilesOsgbToMst) processDrawElementsUInt(indices []uint32, vertices []vec3.T, texCoords []vec2.T, meshNode *mst.MeshNode, faceGroup *mst.MeshTriangle, ext *vec3d.Box) {
-	for i := 0; i+2 < len(indices); i += 3 {
-		v0 := int(indices[i])
-		v1 := int(indices[i+1])
-		v2 := int(indices[i+2])
-
-		if v0 >= len(vertices) || v1 >= len(vertices) || v2 >= len(vertices) {
+		a := vec3.Sub(&verts[i1], &verts[i0])
+		b := vec3.Sub(&verts[i2], &verts[i0])
+		fn := vec3.Cross(&a, &b)
+		len2 := fn[0]*fn[0] + fn[1]*fn[1] + fn[2]*fn[2]
+		if len2 < 1e-10 {
 			continue
 		}
-
-		baseIndex := uint32(len(meshNode.Vertices))
-
-		for _, vi := range []int{v0, v1, v2} {
-			v := vertices[vi]
-			meshNode.Vertices = append(meshNode.Vertices, v)
-			ext.Extend(&vec3d.T{float64(v[0]), float64(v[1]), float64(v[2])})
-
-			if texCoords != nil && vi < len(texCoords) {
-				meshNode.TexCoords = append(meshNode.TexCoords, texCoords[vi])
-			} else {
-				meshNode.TexCoords = append(meshNode.TexCoords, vec2.T{0, 0})
-			}
-
-			meshNode.Normals = append(meshNode.Normals, vec3.T{0, 0, 1})
-		}
-
-		faceGroup.Faces = append(faceGroup.Faces, &mst.Face{
-			Vertex: [3]uint32{baseIndex, baseIndex + 1, baseIndex + 2},
-		})
+		inv := 1.0 / float32(math.Sqrt(float64(len2)))
+		fn[0] *= inv
+		fn[1] *= inv
+		fn[2] *= inv
+		n[i0] = vec3.Add(&n[i0], &fn)
+		n[i1] = vec3.Add(&n[i1], &fn)
+		n[i2] = vec3.Add(&n[i2], &fn)
 	}
-}
-
-func (t *TilesOsgbToMst) processDrawArrays(first int32, count int32, vertices []vec3.T, texCoords []vec2.T, meshNode *mst.MeshNode, faceGroup *mst.MeshTriangle, ext *vec3d.Box) {
-	for i := first; i+2 < first+count; i += 3 {
-		v0 := int(i)
-		v1 := int(i + 1)
-		v2 := int(i + 2)
-
-		if v0 >= len(vertices) || v1 >= len(vertices) || v2 >= len(vertices) {
+	for i := range n {
+		l := n[i][0]*n[i][0] + n[i][1]*n[i][1] + n[i][2]*n[i][2]
+		if l < 1e-10 {
+			n[i] = vec3.T{0, 0, 1}
 			continue
 		}
-
-		baseIndex := uint32(len(meshNode.Vertices))
-
-		for _, vi := range []int{v0, v1, v2} {
-			v := vertices[vi]
-			meshNode.Vertices = append(meshNode.Vertices, v)
-			ext.Extend(&vec3d.T{float64(v[0]), float64(v[1]), float64(v[2])})
-
-			if texCoords != nil && vi < len(texCoords) {
-				meshNode.TexCoords = append(meshNode.TexCoords, texCoords[vi])
-			} else {
-				meshNode.TexCoords = append(meshNode.TexCoords, vec2.T{0, 0})
-			}
-
-			meshNode.Normals = append(meshNode.Normals, vec3.T{0, 0, 1})
-		}
-
-		faceGroup.Faces = append(faceGroup.Faces, &mst.Face{
-			Vertex: [3]uint32{baseIndex, baseIndex + 1, baseIndex + 2},
-		})
+		inv := 1.0 / float32(math.Sqrt(float64(l)))
+		n[i][0] *= inv
+		n[i][1] *= inv
+		n[i][2] *= inv
 	}
+	return n
 }
 
-var _ FormatConvert = (*TilesOsgbToMst)(nil)
+// --- util ---
