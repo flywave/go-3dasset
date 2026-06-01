@@ -78,13 +78,15 @@ func (t *TilesObjToMst) ConvertMultiple(path string) ([]*mst.Mesh, *[6]float64, 
 		}
 
 		finest := findFinestLod(objFiles)
-		if finest == "" {
+		if len(finest) == 0 {
 			continue
 		}
 
 		mesh := mst.NewMesh()
-		if err := t.processObjFile(finest, mesh, &ext); err != nil {
-			continue
+		for _, f := range finest {
+			if err := t.processObjFile(f, mesh, &ext); err != nil {
+				continue
+			}
 		}
 
 		if len(mesh.Nodes) > 0 {

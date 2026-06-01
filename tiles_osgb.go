@@ -28,11 +28,14 @@ type TilesOsgbToMst struct {
 	ApplyOrigin   bool
 	GeoRef        *mst.GeoRef
 	GenerateNormals bool
+	texIdCounter  int32
+	texDataCache  map[string]*mst.Texture
 }
 
 func (t *TilesOsgbToMst) ConvertMultiple(path string) ([]*mst.Mesh, *[6]float64, error) {
 	t.currentPath = path
 	t.loadedFiles = make(map[string]bool)
+	t.texDataCache = make(map[string]*mst.Texture)
 
 	info, err := os.Stat(path)
 	if err != nil {
@@ -70,12 +73,13 @@ func (t *TilesOsgbToMst) ConvertMultiple(path string) ([]*mst.Mesh, *[6]float64,
 			if len(osgbFiles) == 0 {
 				continue
 			}
-			finest := findFinestLod(osgbFiles)
-			if finest == "" {
-				continue
-			}
 			mesh := mst.NewMesh()
-			t.loadFile(finest, mesh, &ext)
+			// Load only the finest LOD sub-tiles; skip the base tile to avoid
+			// duplicating overlapping coarse geometry at lower LOD levels.
+			finest := findFinestLod(osgbFiles)
+			for _, f := range finest {
+				t.loadFile(f, mesh, &ext)
+			}
 			if len(mesh.Nodes) > 0 {
 				if geoRef := t.computeGeoRef(); geoRef != nil {
 					mesh.GeoRef = geoRef
@@ -91,12 +95,9 @@ func (t *TilesOsgbToMst) ConvertMultiple(path string) ([]*mst.Mesh, *[6]float64,
 	// Strategy 2: OSGB files directly in root directory
 	osgbFiles, _ := filepath.Glob(filepath.Join(path, "*.osgb"))
 	if len(osgbFiles) > 0 {
-		// Group by region (files without _L are coarser versions of same region)
 		groups := make(map[string][]string)
 		for _, f := range osgbFiles {
-			base := filepath.Base(f)
-			// Strip _L<level> suffix to group by region
-			region := stripLODSuffix(base)
+			region := stripLODSuffix(filepath.Base(f))
 			groups[region] = append(groups[region], f)
 		}
 		for _, files := range groups {
@@ -104,11 +105,13 @@ func (t *TilesOsgbToMst) ConvertMultiple(path string) ([]*mst.Mesh, *[6]float64,
 				continue
 			}
 			finest := findFinestLod(files)
-			if finest == "" {
+			if len(finest) == 0 {
 				continue
 			}
 			mesh := mst.NewMesh()
-			t.loadFile(finest, mesh, &ext)
+			for _, f := range finest {
+				t.loadFile(f, mesh, &ext)
+			}
 			if len(mesh.Nodes) > 0 {
 				if geoRef := t.computeGeoRef(); geoRef != nil {
 					mesh.GeoRef = geoRef
@@ -135,19 +138,34 @@ func (t *TilesOsgbToMst) Convert(path string) (*mst.Mesh, *[6]float64, error) {
 
 // --- file discovery ---
 
-func findFinestLod(files []string) string {
+func findFinestLod(files []string) []string {
 	if len(files) == 0 {
-		return ""
+		return nil
 	}
-	best := files[0]
-	bestLod := extractLodLevel(filepath.Base(best))
-	for _, f := range files[1:] {
+	bestLod := -1
+	for _, f := range files {
 		if l := extractLodLevel(filepath.Base(f)); l > bestLod {
 			bestLod = l
-			best = f
 		}
 	}
-	return best
+	var result []string
+	for _, f := range files {
+		if extractLodLevel(filepath.Base(f)) == bestLod {
+			result = append(result, f)
+		}
+	}
+	if len(result) == 0 {
+		return files[:1]
+	}
+	return result
+}
+
+func findFinestLodSingle(files []string) string {
+	r := findFinestLod(files)
+	if len(r) == 0 {
+		return ""
+	}
+	return r[0]
 }
 
 func extractLodLevel(filename string) int {
@@ -248,33 +266,41 @@ func (t *TilesOsgbToMst) loadFile(osgbPath string, mesh *mst.Mesh, ext *vec3d.Bo
 	if res == nil || res.GetNode() == nil {
 		return
 	}
-	t.traverse(res.GetNode(), mesh, ext, filepath.Dir(osgbPath), nil)
+	t.traverse(res.GetNode(), mesh, ext, filepath.Dir(osgbPath), nil, nil)
 }
 
-func (t *TilesOsgbToMst) traverse(n interface{}, mesh *mst.Mesh, ext *vec3d.Box, baseDir string, matrix *[4][4]float32) {
+func (t *TilesOsgbToMst) traverse(n interface{}, mesh *mst.Mesh, ext *vec3d.Box, baseDir string, matrix *[4][4]float32, parentStates *model.StateSet) {
+	// Determine effective StateSet: node's own StateSet overrides parent's
+	effectiveStates := parentStates
+	if nodeWithStates, ok := n.(model.NodeInterface); ok {
+		if ss := nodeWithStates.GetStates(); ss != nil {
+			effectiveStates = ss
+		}
+	}
+
 	switch v := n.(type) {
 	case *model.Geode:
 		for _, c := range v.GetChildren() {
 			if g, ok := c.(*model.Geometry); ok {
-				t.processGeometry(g, mesh, ext, matrix)
+				t.processGeometry(g, mesh, ext, matrix, effectiveStates)
 			}
 		}
 
 	case *model.Group:
 		for _, c := range v.GetChildren() {
-			t.traverse(c, mesh, ext, baseDir, matrix)
+			t.traverse(c, mesh, ext, baseDir, matrix, effectiveStates)
 		}
 
 	case *model.MatrixTransform:
 		combined := combineMatrix(matrix, &v.Matrix)
 		for _, c := range v.GetChildren() {
-			t.traverse(c, mesh, ext, baseDir, combined)
+			t.traverse(c, mesh, ext, baseDir, combined, effectiveStates)
 		}
 
 	case *model.PositionAttitudeTransform:
 		combined := combineMatrix(matrix, patToMatrix(v.Position, v.Attitude, v.Scale))
 		for _, c := range v.GetChildren() {
-			t.traverse(c, mesh, ext, baseDir, combined)
+			t.traverse(c, mesh, ext, baseDir, combined, effectiveStates)
 		}
 
 	case *model.PagedLod:
@@ -282,14 +308,14 @@ func (t *TilesOsgbToMst) traverse(n interface{}, mesh *mst.Mesh, ext *vec3d.Box,
 		// PagedLod file references point to lower-LOD child tiles;
 		// skip them to extract only the highest-detail geometry.
 		for _, c := range v.GetChildren() {
-			t.traverse(c, mesh, ext, baseDir, matrix)
+			t.traverse(c, mesh, ext, baseDir, matrix, effectiveStates)
 		}
 	}
 }
 
 // --- geometry processing ---
 
-func (t *TilesOsgbToMst) processGeometry(g *model.Geometry, mesh *mst.Mesh, ext *vec3d.Box, matrix *[4][4]float32) {
+func (t *TilesOsgbToMst) processGeometry(g *model.Geometry, mesh *mst.Mesh, ext *vec3d.Box, matrix *[4][4]float32, parentStates *model.StateSet) {
 	if g.VertexArray == nil || g.VertexArray.Data == nil {
 		return
 	}
@@ -328,39 +354,214 @@ func (t *TilesOsgbToMst) processGeometry(g *model.Geometry, mesh *mst.Mesh, ext 
 	}
 
 	meshNode.FaceGroup = append(meshNode.FaceGroup, faceGroup)
+
 	mesh.Nodes = append(mesh.Nodes, meshNode)
-	mesh.Materials = append(mesh.Materials, &mst.BaseMaterial{Color: [3]byte{200, 200, 200}})
+
+	// Try to extract texture from StateSet (Geometry's own or inherited from parent)
+	// Only apply texture if the geometry has UV coordinates; without UVs the texture
+	// would sample pixel (0,0) of the atlas (often black padding).
+	texture := t.extractOsgTexture(g, parentStates)
+	if texture != nil && hasUV {
+		texMatIdx := len(mesh.Materials)
+		mesh.Materials = append(mesh.Materials, &mst.TextureMaterial{
+			BaseMaterial: mst.BaseMaterial{
+				Color: [3]byte{255, 255, 255},
+			},
+			Texture: texture,
+		})
+		faceGroup.Batchid = int32(texMatIdx)
+	} else {
+		mesh.Materials = append(mesh.Materials, &mst.BaseMaterial{Color: [3]byte{200, 200, 200}})
+	}
+}
+
+func (t *TilesOsgbToMst) extractOsgTexture(g *model.Geometry, parentStates *model.StateSet) *mst.Texture {
+	// Check Geometry's own StateSet first, then inherited parent StateSet
+	ss := g.GetStates()
+	if ss == nil {
+		ss = parentStates
+	}
+	if ss == nil {
+		return nil
+	}
+	for _, attrList := range ss.TextureAttributeList {
+		for _, pair := range attrList {
+			if pair == nil {
+				continue
+			}
+			tex, ok := pair.First.(*model.Texture)
+			if !ok || tex.Image == nil || tex.Image.Data == nil {
+				continue
+			}
+			img := tex.Image
+			w, h := int(img.S), int(img.T)
+			if w <= 0 || h <= 0 {
+				continue
+			}
+			data := img.Data
+			rgbaSize := w * h * 4
+			rgbSize := w * h * 3
+			var rgba []byte
+			if len(data) == rgbaSize {
+				rgba = osgRawToRGBA(data, w, h, 4)
+			} else if len(data) == rgbSize {
+				rgba = osgRawToRGBA(data, w, h, 3)
+			} else {
+				continue
+			}
+			// Deduplicate textures with identical image data: cache by raw data checksum
+			key := fmt.Sprintf("%dx%d_%d", w, h, xxhash(len(rgba), rgba))
+			if cached, ok := t.texDataCache[key]; ok {
+				return cached
+			}
+			t.texIdCounter++
+			texObj := &mst.Texture{
+				Id:         t.texIdCounter,
+				Format:     mst.TEXTURE_FORMAT_RGBA,
+				Size:       [2]uint64{uint64(w), uint64(h)},
+				Compressed: mst.TEXTURE_COMPRESSED_ZLIB,
+				Data:       mst.CompressImage(rgba),
+			}
+			t.texDataCache[key] = texObj
+			return texObj
+		}
+	}
+	return nil
+}
+
+func xxhash(seed int, data []byte) int {
+	h := seed
+	for _, b := range data {
+		h = h*31 + int(b)
+	}
+	return h
+}
+
+func osgRawToRGBA(data []byte, w, h, bpp int) []byte {
+	out := make([]byte, w*h*4)
+	for y := 0; y < h; y++ {
+		for x := 0; x < w; x++ {
+			si := (y*w + x) * bpp
+			di := (y*w + x) * 4
+			out[di+0] = data[si+0]
+			out[di+1] = data[si+1]
+			out[di+2] = data[si+2]
+			if bpp == 4 {
+				out[di+3] = data[si+3]
+			} else {
+				out[di+3] = 255
+			}
+		}
+	}
+	return out
+}
+
+func getPrimMode(prim interface{}) int32 {
+	switch p := prim.(type) {
+	case *model.DrawElementsUInt:
+		return p.Mode
+	case *model.DrawElementsUShort:
+		return p.Mode
+	case *model.DrawElementsUByte:
+		return p.Mode
+	case *model.DrawArrays:
+		return p.Mode
+	}
+	return 0
 }
 
 func (t *TilesOsgbToMst) processPrim(prim interface{}, positions []vec3.T, uvs []vec2.T, hasUV bool, node *mst.MeshNode, fg *mst.MeshTriangle, ext *vec3d.Box) {
-	switch p := prim.(type) {
-	case *model.DrawElementsUInt:
-		if p.Data == nil {
-			return
+	getIndices := func() []uint32 {
+		switch p := prim.(type) {
+		case *model.DrawElementsUInt:
+			return p.Data
+		case *model.DrawElementsUShort:
+			if p.Data == nil {
+				return nil
+			}
+			out := make([]uint32, len(p.Data))
+			for i, v := range p.Data {
+				out[i] = uint32(v)
+			}
+			return out
+		case *model.DrawElementsUByte:
+			if p.Data == nil {
+				return nil
+			}
+			out := make([]uint32, len(p.Data))
+			for i, v := range p.Data {
+				out[i] = uint32(v)
+			}
+			return out
+		case *model.DrawArrays:
+			if p.Count < 3 {
+				return nil
+			}
+			out := make([]uint32, p.Count)
+			for i := uint32(0); i < uint32(p.Count); i++ {
+				out[i] = uint32(p.First) + i
+			}
+			return out
 		}
-		for i := 0; i+2 < len(p.Data); i += 3 {
-			t.emitTriangle(int(p.Data[i]), int(p.Data[i+1]), int(p.Data[i+2]), positions, uvs, hasUV, node, fg, ext)
+		return nil
+	}
+
+	indices := getIndices()
+	if indices == nil || len(indices) < 3 {
+		return
+	}
+
+	n := len(indices)
+	mode := getPrimMode(prim)
+	switch mode {
+	case model.TRIANGLES:
+		for i := 0; i+2 < n; i += 3 {
+			t.emitTriangle(int(indices[i]), int(indices[i+1]), int(indices[i+2]), positions, uvs, hasUV, node, fg, ext)
 		}
-	case *model.DrawElementsUShort:
-		if p.Data == nil {
-			return
+	case model.QUADS:
+		for i := 0; i+3 < n; i += 4 {
+			a, b, c, d := int(indices[i]), int(indices[i+1]), int(indices[i+2]), int(indices[i+3])
+			t.emitTriangle(a, b, c, positions, uvs, hasUV, node, fg, ext)
+			t.emitTriangle(a, c, d, positions, uvs, hasUV, node, fg, ext)
 		}
-		for i := 0; i+2 < len(p.Data); i += 3 {
-			t.emitTriangle(int(p.Data[i]), int(p.Data[i+1]), int(p.Data[i+2]), positions, uvs, hasUV, node, fg, ext)
+	case model.TRIANGLESTRIP:
+		for i := 0; i+2 < n; i++ {
+			if i%2 == 0 {
+				t.emitTriangle(int(indices[i]), int(indices[i+1]), int(indices[i+2]), positions, uvs, hasUV, node, fg, ext)
+			} else {
+				t.emitTriangle(int(indices[i+1]), int(indices[i]), int(indices[i+2]), positions, uvs, hasUV, node, fg, ext)
+			}
 		}
-	case *model.DrawElementsUByte:
-		if p.Data == nil {
-			return
+	case model.TRIANGLEFAN:
+		// Triangle fan: 0-1-2, 0-2-3, 0-3-4, ...
+		for i := 1; i+1 < n; i++ {
+			t.emitTriangle(int(indices[0]), int(indices[i]), int(indices[i+1]), positions, uvs, hasUV, node, fg, ext)
 		}
-		for i := 0; i+2 < len(p.Data); i += 3 {
-			t.emitTriangle(int(p.Data[i]), int(p.Data[i+1]), int(p.Data[i+2]), positions, uvs, hasUV, node, fg, ext)
+	case model.POLYGON:
+		// Simple polygon triangulation: 0-1-2, 0-2-3, 0-3-4, ...
+		for i := 1; i+1 < n; i++ {
+			t.emitTriangle(int(indices[0]), int(indices[i]), int(indices[i+1]), positions, uvs, hasUV, node, fg, ext)
 		}
-	case *model.DrawArrays:
-		if p.Count < 3 {
-			return
-		}
-		for i := int(p.First); i+2 < int(p.First)+int(p.Count); i += 3 {
-			t.emitTriangle(i, i+1, i+2, positions, uvs, hasUV, node, fg, ext)
+	default:
+		// Fallback: infer from count
+		if n%3 == 0 {
+			for i := 0; i+2 < n; i += 3 {
+				t.emitTriangle(int(indices[i]), int(indices[i+1]), int(indices[i+2]), positions, uvs, hasUV, node, fg, ext)
+			}
+		} else if n%4 == 0 {
+			for i := 0; i+3 < n; i += 4 {
+				a, b, c, d := int(indices[i]), int(indices[i+1]), int(indices[i+2]), int(indices[i+3])
+				t.emitTriangle(a, b, c, positions, uvs, hasUV, node, fg, ext)
+				t.emitTriangle(a, c, d, positions, uvs, hasUV, node, fg, ext)
+			}
+		} else {
+			for i := 0; i+2 < n; i++ {
+				if i%2 == 0 {
+					t.emitTriangle(int(indices[i]), int(indices[i+1]), int(indices[i+2]), positions, uvs, hasUV, node, fg, ext)
+				} else {
+					t.emitTriangle(int(indices[i+1]), int(indices[i]), int(indices[i+2]), positions, uvs, hasUV, node, fg, ext)
+				}
+			}
 		}
 	}
 }

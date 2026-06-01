@@ -159,16 +159,18 @@ func TestTilesOsgbConvert(t *testing.T) {
 	outputDir := "./test_output"
 	os.MkdirAll(outputDir, 0755)
 
+	var mergedMesh *mst.Mesh
 	if len(meshes) == 1 {
+		mergedMesh = meshes[0]
 		mstPath := filepath.Join(outputDir, "tiles_osgb_multi.mst")
 		start = time.Now()
-		err = mst.MeshWriteTo(mstPath, meshes[0])
+		err = mst.MeshWriteTo(mstPath, mergedMesh)
 		if err != nil {
 			t.Fatalf("MeshWriteTo failed: %v", err)
 		}
 		t.Logf("MST saved to %s, Duration: %v", mstPath, time.Since(start))
 	} else if len(meshes) > 1 {
-		mergedMesh := mst.NewMesh()
+		mergedMesh = mst.NewMesh()
 		for i := range meshes {
 			offset := uint32(len(mergedMesh.Materials))
 			for _, node := range meshes[i].Nodes {
@@ -190,9 +192,9 @@ func TestTilesOsgbConvert(t *testing.T) {
 
 	glbPath := filepath.Join(outputDir, "tiles_osgb_multi.glb")
 	start = time.Now()
-	err = ConvertToGlbMultiple(meshes, glbPath)
+	err = ConvertToGlb(mergedMesh, glbPath)
 	if err != nil {
-		t.Fatalf("ConvertToGlbMultiple failed: %v", err)
+		t.Fatalf("ConvertToGlb failed: %v", err)
 	}
 	t.Logf("GLB saved to %s, Duration: %v", glbPath, time.Since(start))
 

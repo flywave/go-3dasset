@@ -41,17 +41,18 @@ func TestFindFinestLod(t *testing.T) {
 	tests := []struct {
 		name string
 		files []string
-		want string
+		want int
+		any bool
 	}{
 		{
 			name: "empty",
 			files: []string{},
-			want: "",
+			want: 0,
 		},
 		{
 			name: "single",
 			files: []string{"file.osgb"},
-			want: "file.osgb",
+			want: 1,
 		},
 		{
 			name: "multiple_lods",
@@ -60,18 +61,32 @@ func TestFindFinestLod(t *testing.T) {
 				"Tile_L22_0.osgb",
 				"Tile_L20_0.osgb",
 			},
-			want: "Tile_L22_0.osgb",
+			want: 1,
 		},
 		{
-			name: "no_lod_in_name",
-			files: []string{"a.osgb", "b.osgb", "c.osgb"},
-			want: "a.osgb",
+			name: "same_lod",
+			files: []string{
+				"Tile_L24_00001.osgb",
+				"Tile_L24_00002.osgb",
+				"Tile_L24_00003.osgb",
+			},
+			want: 3,
+		},
+		{
+			name: "mixed_plus_no_lod",
+			files: []string{
+				"base.osgb",
+				"Tile_L18_0.osgb",
+				"Tile_L24_00001.osgb",
+				"Tile_L24_00002.osgb",
+			},
+			want: 2,
 		},
 	}
 	for _, tt := range tests {
 		got := findFinestLod(tt.files)
-		if got != tt.want {
-			t.Errorf("%s: findFinestLod = %q, want %q", tt.name, got, tt.want)
+		if len(got) != tt.want {
+			t.Errorf("%s: findFinestLod returned %d files (%v), want %d", tt.name, len(got), got, tt.want)
 		}
 	}
 }
@@ -522,8 +537,8 @@ func TestComputeNormals_DegenerateTriangle(t *testing.T) {
 }
 
 func TestFindFinestLod_NilInput(t *testing.T) {
-	if r := findFinestLod(nil); r != "" {
-		t.Error("expected empty string for nil input")
+	if r := findFinestLod(nil); len(r) != 0 {
+		t.Errorf("expected empty result for nil input, got %v", r)
 	}
 }
 
